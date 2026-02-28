@@ -11,7 +11,7 @@ from .models import StockMovement
 from .serializers import StockMovementSerializer
 
 class LaptopViewSet(AuditModelViewSet):
-    queryset = Laptop.objects.all()
+    queryset = Laptop.objects.all().order_by("-id")
     serializer_class = LaptopSerializer
     permission_classes = [IsStaffOrAdmin]
     filterset_fields = ['status', 'brand', 'model']

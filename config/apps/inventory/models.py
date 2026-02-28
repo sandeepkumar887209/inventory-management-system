@@ -8,13 +8,19 @@ class Laptop(AuditModel):
         ("RENTED", "Rented"),
         ("SOLD", "Sold"),
         ("SCRAP", "Scrap"),
+        ("DEMO", "Demo"),
     )
 
     brand = models.CharField(max_length=100)
     model = models.CharField(max_length=100)
     serial_number = models.CharField(max_length=100, unique=True)
+    processor = models.CharField(max_length=100)
+    ram = models.CharField(max_length=50)
+    storage = models.CharField(max_length=50)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    rent_per_month = models.DecimalField(max_digits=10, decimal_places=2)
 
-    specs = models.JSONField(default=dict)
+    description = models.JSONField(default=dict)
 
     status = models.CharField(
         max_length=20,
