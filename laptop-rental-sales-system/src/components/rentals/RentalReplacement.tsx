@@ -6,71 +6,92 @@ import { useNavigate } from "react-router-dom";
 export function RentalReplacement() {
   const navigate = useNavigate();
 
-  const [rentals, setRentals] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+
+  const [rentedLaptops, setRentedLaptops] = useState<any[]>([]);
   const [availableLaptops, setAvailableLaptops] = useState<any[]>([]);
-  const [selectedRental, setSelectedRental] = useState<any>(null);
+
   const [oldLaptop, setOldLaptop] = useState("");
   const [newLaptop, setNewLaptop] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchData();
+    fetchCustomers();
+    fetchAvailableLaptops();
   }, []);
 
-  const fetchData = async () => {
-    try {
-      const rentalRes = await api.get("/rentals/rental/");
-      const laptopRes = await api.get("/inventory/laptops/?status=AVAILABLE");
-
-      const rentalData = Array.isArray(rentalRes.data)
-        ? rentalRes.data
-        : rentalRes.data.results || [];
-
-      const laptopData = Array.isArray(laptopRes.data)
-        ? laptopRes.data
-        : laptopRes.data.results || [];
-
-      // Show only rentals that are not fully returned
-      setRentals(
-        rentalData.filter(
-          (r: any) => r.status?.toUpperCase() !== "RETURNED"
-        )
-      );
-
-      // Only AVAILABLE laptops
-      setAvailableLaptops(
-        laptopData.filter(
-          (l: any) => l.status?.toUpperCase() === "AVAILABLE"
-        )
-      );
-    } catch (error) {
-      console.error("Fetch error:", error);
-    }
+  const fetchCustomers = async () => {
+    const res = await api.get("/customers/customers/");
+    const data = Array.isArray(res.data)
+      ? res.data
+      : res.data.results || [];
+    setCustomers(data);
   };
 
-  const handleRentalChange = (id: string) => {
-    const rental = rentals.find((r) => r.id === Number(id));
-    setSelectedRental(rental);
+  const fetchAvailableLaptops = async () => {
+    const res = await api.get("/inventory/laptops/?status=AVAILABLE");
+    const data = Array.isArray(res.data)
+      ? res.data
+      : res.data.results || [];
+    setAvailableLaptops(data);
+  };
+
+  const fetchRentedLaptops = async (customerId: number) => {
+    const res = await api.get(
+      `/inventory/laptops/?status=RENTED&customer=${customerId}`
+    );
+    const data = Array.isArray(res.data)
+      ? res.data
+      : res.data.results || [];
+    setRentedLaptops(data);
     setOldLaptop("");
     setNewLaptop("");
   };
 
+  const filteredCustomers = customers.filter((c) =>
+    c.name.toLowerCase().includes(customerSearch.toLowerCase())
+  );
+
+  const handleCustomerSelect = (customer: any) => {
+    setSelectedCustomer(customer);
+    fetchRentedLaptops(customer.id);
+  };
+
   const handleSubmit = async () => {
-    if (!selectedRental || !oldLaptop || !newLaptop) {
-      alert("Please fill all fields");
+    if (!selectedCustomer || !oldLaptop || !newLaptop) {
+      alert("Select all fields");
       return;
     }
 
     if (oldLaptop === newLaptop) {
-      alert("Old and New laptop cannot be same");
+      alert("Old and new laptop cannot be same");
       return;
     }
 
     try {
       setLoading(true);
 
+      const rentalRes = await api.get("/rentals/rental/");
+      const rentals = Array.isArray(rentalRes.data)
+        ? rentalRes.data
+        : rentalRes.data.results || [];
+
+      const activeRental = rentals.find(
+        (r: any) =>
+          (r.customer === selectedCustomer.id ||
+            r.customer_detail?.id === selectedCustomer.id) &&
+          r.status === "ONGOING"
+      );
+
+      if (!activeRental) {
+        alert("No active rental found");
+        return;
+      }
+
       await api.post(
-        `/rentals/rental/${selectedRental.id}/replace_laptop/`,
+        `/rentals/rental/${activeRental.id}/replace_laptop/`,
         {
           old_laptop: Number(oldLaptop),
           new_laptop: Number(newLaptop),
@@ -78,8 +99,7 @@ export function RentalReplacement() {
       );
 
       alert("Replacement successful ✅");
-
-      navigate("/rentals/rental");
+      navigate("/rentals");
     } catch (error: any) {
       console.error(error.response?.data || error);
       alert("Error while saving replacement");
@@ -90,86 +110,63 @@ export function RentalReplacement() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">
-        Rental Replacement
-      </h1>
+      <h1 className="text-2xl font-bold">Rental Replacement</h1>
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-200 space-y-4">
-        {/* Select Rental */}
-        <div>
-          <label className="block mb-2 text-sm font-medium">
-            Select Rental
-          </label>
+        <input
+          type="text"
+          placeholder="Search customer..."
+          value={customerSearch}
+          onChange={(e) => setCustomerSearch(e.target.value)}
+          className="border px-3 py-2 rounded w-full mb-2"
+        />
+
+        <div className="max-h-60 overflow-y-auto space-y-2">
+          {filteredCustomers.map((c) => (
+            <div
+              key={c.id}
+              className="border p-3 rounded cursor-pointer"
+              onClick={() => handleCustomerSelect(c)}
+            >
+              <div className="font-semibold">{c.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {selectedCustomer && rentedLaptops.length > 0 && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-200 space-y-4">
           <select
-            className="w-full border border-neutral-200 rounded-lg p-2"
-            onChange={(e) => handleRentalChange(e.target.value)}
-            value={selectedRental?.id || ""}
+            value={oldLaptop}
+            onChange={(e) => setOldLaptop(e.target.value)}
+            className="w-full border p-2 rounded"
           >
-            <option value="">
-              -- Select Rental --
-            </option>
-            {rentals.map((r) => (
-              <option key={r.id} value={r.id}>
-                Rental #{r.id} - {r.customer_detail?.name}
+            <option value="">Select Old Laptop</option>
+            {rentedLaptops.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.brand} {l.model} ({l.serial_number})
               </option>
             ))}
           </select>
-        </div>
 
-        {/* Old Laptop */}
-        {selectedRental && (
-          <div>
-            <label className="block mb-2 text-sm font-medium">
-              Old Laptop
-            </label>
-            <select
-              className="w-full border border-neutral-200 rounded-lg p-2"
-              value={oldLaptop}
-              onChange={(e) => setOldLaptop(e.target.value)}
-            >
-              <option value="">
-                -- Select Old Laptop --
-              </option>
-              {selectedRental.items_detail
-                ?.filter((item: any) => !item.is_returned)
-                .map((item: any) => (
-                  <option
-                    key={item.laptop.id}
-                    value={item.laptop.id}
-                  >
-                    {item.laptop.brand} {item.laptop.model} (
-                    {item.laptop.serial_number})
-                  </option>
-                ))}
-            </select>
-          </div>
-        )}
-
-        {/* New Laptop */}
-        <div>
-          <label className="block mb-2 text-sm font-medium">
-            New Laptop
-          </label>
           <select
-            className="w-full border border-neutral-200 rounded-lg p-2"
             value={newLaptop}
             onChange={(e) => setNewLaptop(e.target.value)}
+            className="w-full border p-2 rounded"
           >
-            <option value="">
-              -- Select New Laptop --
-            </option>
+            <option value="">Select New Laptop</option>
             {availableLaptops.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.brand} {l.model} ({l.serial_number})
               </option>
             ))}
           </select>
-        </div>
 
-        <Button onClick={handleSubmit} disabled={loading}>
-          {loading ? "Processing..." : "Submit Replacement"}
-        </Button>
-      </div>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? "Processing..." : "Submit Replacement"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

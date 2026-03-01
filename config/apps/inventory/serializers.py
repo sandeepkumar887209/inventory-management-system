@@ -1,7 +1,17 @@
 from rest_framework import serializers
-from .models import Laptop
+from .models import Laptop, StockMovement
+from apps.customers.models import Customer
+
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ("id", "name", "phone", "email")
+
 
 class LaptopSerializer(serializers.ModelSerializer):
+    # Nested customer info
+    customer_detail = CustomerSerializer(source="customer", read_only=True)
+
     class Meta:
         model = Laptop
         fields = '__all__'
@@ -9,10 +19,6 @@ class LaptopSerializer(serializers.ModelSerializer):
             'created_by', 'updated_by', 'created_at', 'updated_at'
         )
 
-
-
-from rest_framework import serializers
-from .models import StockMovement
 
 class StockMovementSerializer(serializers.ModelSerializer):
     class Meta:
@@ -26,13 +32,12 @@ class StockMovementSerializer(serializers.ModelSerializer):
         # Update laptop status based on movement
         if movement_type == "IN":
             laptop.status = "AVAILABLE"
-
+            laptop.customer = None
         elif movement_type == "OUT":
             laptop.status = "RENTED"
-
         elif movement_type == "RETURN":
             laptop.status = "AVAILABLE"
-
+            laptop.customer = None
         elif movement_type == "DAMAGE":
             laptop.status = "SCRAP"
 

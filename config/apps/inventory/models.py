@@ -1,5 +1,6 @@
 from django.db import models
 from apps.common.models import AuditModel
+from apps.customers.models import Customer
 
 
 class Laptop(AuditModel):
@@ -15,10 +16,23 @@ class Laptop(AuditModel):
     model = models.CharField(max_length=100)
     serial_number = models.CharField(max_length=100, unique=True)
     processor = models.CharField(max_length=100)
+    generation = models.CharField(max_length=100)
     ram = models.CharField(max_length=50)
     storage = models.CharField(max_length=50)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     rent_per_month = models.DecimalField(max_digits=10, decimal_places=2)
+
+    # ✅ NEW FIELD
+    purchased_from = models.CharField(max_length=150, blank=True)
+
+    # ✅ CURRENT HOLDER
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="current_laptops"
+    )
 
     description = models.JSONField(default=dict)
 
@@ -33,7 +47,6 @@ class Laptop(AuditModel):
 
     def __str__(self):
         return f"{self.brand} {self.model} ({self.serial_number})"
-
 
 class StockMovement(AuditModel):
     MOVEMENT_TYPE = (

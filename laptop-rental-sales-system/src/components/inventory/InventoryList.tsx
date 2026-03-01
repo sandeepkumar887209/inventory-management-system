@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
-  Plus,
   Search,
-  Download,
   Edit,
-  Trash2,
   Eye,
   ChevronLeft,
   ChevronRight,
@@ -13,7 +10,6 @@ import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import {
   getLaptops,
-  deleteLaptop,
 } from "../../services/inventory";
 
 interface Laptop {
@@ -22,28 +18,32 @@ interface Laptop {
   model: string;
   serial_number: string;
   processor: string;
+  generation: string;
   ram: string;
   storage: string;
-  condition: "Excellent" | "Good" | "Fair";
-  status: "Available" | "Rented" | "Sold" | "Maintenance";
   price: number;
-  rental_price: number;
-  purchase_date: string;
+  rent_per_month: number;
+  purchased_from?: string;
+  description: any;
+  status: "AVAILABLE" | "RENTED" | "SOLD" | "SCRAP" | "DEMO";
+  customer?: {
+    id: number;
+    name: string;
+  } | null;
 }
 
 interface InventoryListProps {
+  refreshKey: number;
   onAddNew: () => void;
   onEdit: (laptop: Laptop) => void;
-  onView: (laptop: Laptop) => void;
 }
-
 
 export function InventoryList({
   refreshKey,
   onAddNew,
   onEdit,
-  onView,
 }: InventoryListProps) {
+
   const [laptops, setLaptops] = useState<Laptop[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -51,9 +51,10 @@ export function InventoryList({
   const [brandFilter, setBrandFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [selectedLaptop, setSelectedLaptop] = useState<Laptop | null>(null);
+
   const itemsPerPage = 10;
 
-  /* ================= FETCH DATA ================= */
   const fetchLaptops = async () => {
     try {
       const res = await getLaptops();
@@ -65,19 +66,10 @@ export function InventoryList({
     }
   };
 
- useEffect(() => {
-  fetchLaptops();
-}, [refreshKey]);
-
-
-  /* ================= DELETE ================= */
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this laptop?")) return;
-    await deleteLaptop(id);
+  useEffect(() => {
     fetchLaptops();
-  };
+  }, [refreshKey]);
 
-  /* ================= FILTERING ================= */
   const brands = ["all", ...Array.from(new Set(laptops.map(l => l.brand)))];
 
   const filteredLaptops = laptops.filter(l => {
@@ -95,7 +87,6 @@ export function InventoryList({
     return matchesSearch && matchesStatus && matchesBrand;
   });
 
-  /* ================= PAGINATION ================= */
   const totalPages = Math.ceil(filteredLaptops.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedLaptops = filteredLaptops.slice(
@@ -105,10 +96,11 @@ export function InventoryList({
 
   const getStatusBadge = (status: Laptop["status"]) => {
     const variants: any = {
-      Available: "success",
-      Rented: "info",
-      Sold: "neutral",
-      Maintenance: "warning",
+      AVAILABLE: "success",
+      RENTED: "info",
+      SOLD: "neutral",
+      SCRAP: "danger",
+      DEMO: "warning",
     };
     return <Badge variant={variants[status]}>{status}</Badge>;
   };
@@ -117,9 +109,58 @@ export function InventoryList({
     return <div className="p-6 text-neutral-600">Loading inventory...</div>;
   }
 
+  /* ================= DETAILS VIEW ================= */
+  if (selectedLaptop) {
+    return (
+      <div className="space-y-6">
+        <Button variant="secondary" onClick={() => setSelectedLaptop(null)}>
+          ← Back to Inventory
+        </Button>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-neutral-200 space-y-6">
+          <h1 className="text-2xl font-bold">
+            {selectedLaptop.brand} {selectedLaptop.model}
+          </h1>
+
+          <div className="grid grid-cols-2 gap-4 text-sm">
+
+            <div><strong>Serial Number:</strong> {selectedLaptop.serial_number}</div>
+            <div><strong>Status:</strong> {selectedLaptop.status}</div>
+
+            <div><strong>Processor:</strong> {selectedLaptop.processor}</div>
+            <div><strong>Generation:</strong> {selectedLaptop.generation}</div>
+
+            <div><strong>RAM:</strong> {selectedLaptop.ram}</div>
+            <div><strong>Storage:</strong> {selectedLaptop.storage}</div>
+
+            <div><strong>Price:</strong> ₹{selectedLaptop.price}</div>
+            <div><strong>Rent Per Month:</strong> ₹{selectedLaptop.rent_per_month}</div>
+
+            <div><strong>Purchased From:</strong> {selectedLaptop.purchased_from || "-"}</div>
+
+            <div>
+              <strong>Current Customer:</strong>{" "}
+              {selectedLaptop.customer_detail?.name || "None"}
+            </div>
+
+            <div className="col-span-2">
+              <strong>Description:</strong>
+              <pre className="bg-neutral-100 p-3 rounded mt-2 text-xs">
+                {JSON.stringify(selectedLaptop.description, null, 2)}
+              </pre>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ================= TABLE VIEW ================= */
+
   return (
     <div className="space-y-6">
-      {/* HEADER */}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">
@@ -129,19 +170,14 @@ export function InventoryList({
             {filteredLaptops.length} laptops found
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="secondary">
-            🡻 Export
-          </Button>
-          <Button onClick={onAddNew}>
-            ✚ Add Laptop
-          </Button>
-        </div>
+        <Button onClick={onAddNew}>
+          ✚ Add Laptop
+        </Button>
       </div>
 
-      {/* FILTERS */}
       <div className="bg-white p-4 rounded-xl border border-neutral-200">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+
           <div className="md:col-span-2 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
             <input
@@ -161,7 +197,8 @@ export function InventoryList({
             <option value="AVAILABLE">Available</option>
             <option value="RENTED">Rented</option>
             <option value="SOLD">Sold</option>
-            <option value="Maintenance">Maintenance</option>
+            <option value="SCRAP">Scrap</option>
+            <option value="DEMO">Demo</option>
           </select>
 
           <select
@@ -175,10 +212,10 @@ export function InventoryList({
               </option>
             ))}
           </select>
+
         </div>
       </div>
 
-      {/* TABLE */}
       <div className="bg-white rounded-xl border border-neutral-200 overflow-x-auto">
         <table className="w-full">
           <thead className="bg-neutral-50 border-b">
@@ -186,7 +223,6 @@ export function InventoryList({
               <th className="px-6 py-4 text-left">Laptop</th>
               <th className="px-6 py-4">Specs</th>
               <th className="px-6 py-4">Serial</th>
-              <th className="px-6 py-4">Condition</th>
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4">Price</th>
               <th className="px-6 py-4">Actions</th>
@@ -202,6 +238,7 @@ export function InventoryList({
                 </td>
                 <td className="px-6 py-4 text-sm text-neutral-600">
                   {l.processor}<br />
+                  Gen: {l.generation}<br />
                   {l.ram} • {l.storage}
                 </td>
                 <td className="px-6 py-4">
@@ -209,7 +246,6 @@ export function InventoryList({
                     {l.serial_number}
                   </code>
                 </td>
-                <td className="px-6 py-4">{l.condition}</td>
                 <td className="px-6 py-4">{getStatusBadge(l.status)}</td>
                 <td className="px-6 py-4">
                   ₹{l.price.toLocaleString()}
@@ -218,14 +254,11 @@ export function InventoryList({
                   </div>
                 </td>
                 <td className="px-6 py-4 flex gap-2">
-                  <button onClick={() => onView(l)}>
-                    <Eye className="w-4 h-4" />
+                  <button onClick={() => setSelectedLaptop(l)}>
+                    <Eye className="w-4 h-4 text-green-600" />
                   </button>
                   <button onClick={() => onEdit(l)}>
                     <Edit className="w-4 h-4 text-blue-600" />
-                  </button>
-                  <button onClick={() => handleDelete(l.id)}>
-                    <Trash2 className="w-4 h-4 text-red-600" />
                   </button>
                 </td>
               </tr>
@@ -234,28 +267,6 @@ export function InventoryList({
         </table>
       </div>
 
-      {/* PAGINATION */}
-      {totalPages > 1 && (
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-neutral-600">
-            Page {currentPage} of {totalPages}
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft />
-            </button>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

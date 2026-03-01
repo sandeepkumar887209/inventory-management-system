@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
+from django.db import transaction
 
 from .models import Rental, RentalItem
 from .serializers import RentalSerializer
@@ -13,60 +14,71 @@ class RentalViewSet(ModelViewSet):
     queryset = Rental.objects.all().order_by("-created_at")
     serializer_class = RentalSerializer
 
-    # 🔥 RETURN → CREATE NEW RENTAL ENTRY
+
+    # =========================================================
+    # 🔥 RETURN LAPTOPS
+    # =========================================================
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def return_laptops(self, request, pk=None):
+
         original_rental = self.get_object()
         laptop_ids = request.data.get("laptops", [])
 
         if not laptop_ids:
-            return Response({"error": "No laptops selected"},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "No laptops selected"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Create NEW rental entry
+        # 🔥 Create NEW rental entry (history)
         new_rental = Rental.objects.create(
             customer=original_rental.customer,
             parent_rental=original_rental,
             expected_return_date=original_rental.expected_return_date,
             actual_return_date=timezone.now().date(),
             status="RETURNED",
-            gst=original_rental.gst
+            subtotal=original_rental.subtotal,
+            gst=original_rental.gst,
+            total_amount=original_rental.total_amount,
         )
 
         returned = []
 
-        for lid in laptop_ids:
+        for laptop_id in laptop_ids:
             try:
-                old_item = RentalItem.objects.get(
-                    rental=original_rental,
-                    laptop_id=lid
+                laptop = Laptop.objects.get(
+                    id=laptop_id,
+                    customer=original_rental.customer,
+                    status="RENTED"
                 )
-            except RentalItem.DoesNotExist:
+            except Laptop.DoesNotExist:
                 continue
 
-            laptop = old_item.laptop
-
-            if laptop.status != "RENTED":
-                continue
-
-            # Make laptop available
-            laptop.status = "AVAILABLE"
-            laptop.save()
-
+            # 🔥 Stock movement
             StockMovement.objects.create(
                 laptop=laptop,
                 movement_type="RETURN",
                 quantity=1,
-                remarks=f"Return Rental #{original_rental.id}"
+                remarks=f"Returned from Rental #{original_rental.id}"
             )
 
+            # Update inventory
+            laptop.status = "AVAILABLE"
+            laptop.customer = None
+            laptop.save()
+
+            # 🔥 Store in RentalItem
             RentalItem.objects.create(
                 rental=new_rental,
                 laptop=laptop,
-                rent_price=old_item.rent_price
+                rent_price=laptop.rent_per_month
             )
 
             returned.append(laptop.serial_number)
+
+        if not returned:
+            raise Exception("No valid laptops returned")
 
         return Response({
             "success": True,
@@ -74,71 +86,96 @@ class RentalViewSet(ModelViewSet):
             "returned_laptops": returned
         })
 
-    # 🔥 REPLACEMENT → CREATE NEW RENTAL ENTRY
+
+    # =========================================================
+    # 🔥 REPLACE LAPTOP
+    # =========================================================
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def replace_laptop(self, request, pk=None):
+
         original_rental = self.get_object()
         old_id = request.data.get("old_laptop")
         new_id = request.data.get("new_laptop")
 
-        try:
-            old_item = RentalItem.objects.get(
-                rental=original_rental,
-                laptop_id=old_id
+        if not old_id or not new_id:
+            return Response(
+                {"error": "Old and New laptop required"},
+                status=status.HTTP_400_BAD_REQUEST
             )
-        except RentalItem.DoesNotExist:
-            return Response({"error": "Old laptop invalid"},
-                            status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            new_laptop = Laptop.objects.get(id=new_id, status="AVAILABLE")
+            old_laptop = Laptop.objects.get(
+                id=old_id,
+                customer=original_rental.customer,
+                status="RENTED"
+            )
         except Laptop.DoesNotExist:
-            return Response({"error": "New laptop not available"},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Old laptop invalid"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Create NEW rental entry
+        try:
+            new_laptop = Laptop.objects.get(
+                id=new_id,
+                status="AVAILABLE"
+            )
+        except Laptop.DoesNotExist:
+            return Response(
+                {"error": "New laptop not available"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 🔥 Create NEW rental entry
         new_rental = Rental.objects.create(
             customer=original_rental.customer,
             parent_rental=original_rental,
             expected_return_date=original_rental.expected_return_date,
             status="REPLACED",
-            gst=original_rental.gst
+            subtotal=original_rental.subtotal,
+            gst=original_rental.gst,
+            total_amount=original_rental.total_amount,
         )
 
-        old_laptop = old_item.laptop
-
-        # Old laptop → available
-        old_laptop.status = "AVAILABLE"
-        old_laptop.save()
-
+        # -----------------------
+        # OLD → RETURN
+        # -----------------------
         StockMovement.objects.create(
             laptop=old_laptop,
             movement_type="RETURN",
             quantity=1,
-            remarks=f"Replacement Rental #{original_rental.id}"
+            remarks=f"Replacement - Rental #{original_rental.id}"
         )
 
-        # New laptop → rented
-        new_laptop.status = "RENTED"
-        new_laptop.save()
-
-        StockMovement.objects.create(
-            laptop=new_laptop,
-            movement_type="OUT",
-            quantity=1,
-            remarks=f"Replacement Rental #{original_rental.id}"
-        )
+        old_laptop.status = "AVAILABLE"
+        old_laptop.customer = None
+        old_laptop.save()
 
         RentalItem.objects.create(
             rental=new_rental,
             laptop=old_laptop,
-            rent_price=old_item.rent_price
+            rent_price=old_laptop.rent_per_month
         )
+
+        # -----------------------
+        # NEW → OUT
+        # -----------------------
+        StockMovement.objects.create(
+            laptop=new_laptop,
+            movement_type="OUT",
+            quantity=1,
+            remarks=f"Replacement - Rental #{original_rental.id}"
+        )
+
+        new_laptop.status = "RENTED"
+        new_laptop.customer = original_rental.customer
+        new_laptop.save()
 
         RentalItem.objects.create(
             rental=new_rental,
             laptop=new_laptop,
-            rent_price=old_item.rent_price
+            rent_price=new_laptop.rent_per_month
         )
 
         return Response({

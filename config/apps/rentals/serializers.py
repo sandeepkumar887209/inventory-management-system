@@ -32,8 +32,17 @@ class RentalItemSerializer(serializers.ModelSerializer):
 class RentalSerializer(serializers.ModelSerializer):
     customer_detail = CustomerNestedSerializer(source="customer", read_only=True)
 
-    items = RentalItemSerializer(many=True, write_only=True)
-    items_detail = RentalItemSerializer(source="items", many=True, read_only=True)
+    items = RentalItemSerializer(
+        many=True,
+        write_only=True,
+        required=False   # ✅ FIX
+    )
+
+    items_detail = RentalItemSerializer(
+        source="items",
+        many=True,
+        read_only=True
+    )
 
     total_items = serializers.SerializerMethodField()
 
@@ -45,7 +54,7 @@ class RentalSerializer(serializers.ModelSerializer):
         return obj.items.count()
 
     def create(self, validated_data):
-        items_data = validated_data.pop("items")
+        items_data = validated_data.pop("items", [])  # ✅ safe pop
         rental = Rental.objects.create(**validated_data)
 
         subtotal = 0
@@ -60,6 +69,7 @@ class RentalSerializer(serializers.ModelSerializer):
                 )
 
             laptop.status = "RENTED"
+            laptop.customer = rental.customer
             laptop.save()
 
             StockMovement.objects.create(

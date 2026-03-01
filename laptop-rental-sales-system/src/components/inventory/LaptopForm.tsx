@@ -1,17 +1,18 @@
 import React, { useState } from "react";
-import { Upload, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Button } from "../common/Button";
-import api from "../../services/axios";
 
 interface LaptopFormData {
   brand: string;
   model: string;
   serial_number: string;
   processor: string;
+  generation: string; // ✅ ADDED
   ram: string;
   storage: string;
   price: string;
   rent_per_month: string;
+  purchased_from: string;
   status: string;
   description: string;
 }
@@ -22,17 +23,20 @@ interface LaptopFormProps {
   onCancel: () => void;
 }
 
-
 export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
   const [formData, setFormData] = useState<LaptopFormData>({
     brand: laptop?.brand || "",
     model: laptop?.model || "",
     serial_number: laptop?.serial_number || "",
     processor: laptop?.processor || "",
+    generation: laptop?.generation || "", // ✅ ADDED
     ram: laptop?.ram || "",
     storage: laptop?.storage || "",
     price: laptop?.price ? String(laptop.price) : "",
-    rent_per_month: laptop?.rent_per_month ? String(laptop.rent_per_month) : "",
+    rent_per_month: laptop?.rent_per_month
+      ? String(laptop.rent_per_month)
+      : "",
+    purchased_from: laptop?.purchased_from || "",
     status: laptop?.status || "AVAILABLE",
     description: laptop?.description?.notes || "",
   });
@@ -41,11 +45,16 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
   const [loading, setLoading] = useState(false);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
   };
 
   const validate = () => {
@@ -54,6 +63,7 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
       "model",
       "serial_number",
       "processor",
+      "generation", // ✅ REQUIRED
       "ram",
       "storage",
       "price",
@@ -61,6 +71,7 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
     ];
 
     const newErrors: Record<string, string> = {};
+
     required.forEach((field) => {
       if (!formData[field as keyof LaptopFormData]) {
         newErrors[field] = "Required";
@@ -82,10 +93,12 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
       model: formData.model,
       serial_number: formData.serial_number,
       processor: formData.processor,
+      generation: formData.generation, // ✅ SENT TO BACKEND
       ram: formData.ram,
       storage: formData.storage,
-      price: Number(formData.price),
-      rent_per_month: Number(formData.rent_per_month),
+      price: parseFloat(formData.price),
+      rent_per_month: parseFloat(formData.rent_per_month),
+      purchased_from: formData.purchased_from,
       status: formData.status,
       description: {
         notes: formData.description,
@@ -93,25 +106,32 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
     };
 
     try {
-      await onSubmit(payload);   // ✅ CALL APP
-    } catch (err) {
-      alert("Failed to save laptop");
+      await onSubmit(payload);
+    } catch (error: any) {
+      console.error(error);
+      alert(
+        error?.response?.data?.serial_number
+          ? "Serial number already exists"
+          : "Failed to save laptop"
+      );
     } finally {
       setLoading(false);
     }
   };
-
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {Object.keys(errors).length > 0 && (
         <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
           <AlertCircle className="w-5 h-5 text-red-600" />
-          <p className="text-sm text-red-800">Please fill all required fields</p>
+          <p className="text-sm text-red-800">
+            Please fill all required fields
+          </p>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
         {/* Brand */}
         <div>
           <label className="block text-sm font-medium mb-2">Brand *</label>
@@ -145,7 +165,9 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
 
         {/* Serial */}
         <div>
-          <label className="block text-sm font-medium mb-2">Serial Number *</label>
+          <label className="block text-sm font-medium mb-2">
+            Serial Number *
+          </label>
           <input
             name="serial_number"
             value={formData.serial_number}
@@ -162,6 +184,20 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
             value={formData.processor}
             onChange={handleChange}
             className="w-full px-4 py-2 border border-neutral-200 rounded-lg"
+          />
+        </div>
+
+        {/* ✅ Generation */}
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            Generation *
+          </label>
+          <input
+            name="generation"
+            value={formData.generation}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border border-neutral-200 rounded-lg"
+            placeholder="e.g. 10th Gen / M1 / Ryzen 5 5000"
           />
         </div>
 
@@ -202,6 +238,7 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
           <label className="block text-sm font-medium mb-2">Price *</label>
           <input
             type="number"
+            step="0.01"
             name="price"
             value={formData.price}
             onChange={handleChange}
@@ -216,10 +253,25 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
           </label>
           <input
             type="number"
+            step="0.01"
             name="rent_per_month"
             value={formData.rent_per_month}
             onChange={handleChange}
             className="w-full px-4 py-2 border border-neutral-200 rounded-lg"
+          />
+        </div>
+
+        {/* Purchased From */}
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            Purchased From
+          </label>
+          <input
+            name="purchased_from"
+            value={formData.purchased_from}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border border-neutral-200 rounded-lg"
+            placeholder="Vendor / Supplier Name"
           />
         </div>
 
@@ -240,19 +292,13 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
           </select>
         </div>
 
-        {/* Image UI only */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Laptop Image</label>
-          <div className="border-2 border-dashed rounded-lg p-6 text-center">
-            <Upload className="mx-auto text-neutral-400" />
-            <p className="text-sm text-neutral-600">Image upload (optional)</p>
-          </div>
-        </div>
       </div>
 
       {/* Description */}
       <div>
-        <label className="block text-sm font-medium mb-2">Description</label>
+        <label className="block text-sm font-medium mb-2">
+          Description / Notes
+        </label>
         <textarea
           name="description"
           value={formData.description}
@@ -262,7 +308,6 @@ export function LaptopForm({ laptop, onSubmit, onCancel }: LaptopFormProps) {
         />
       </div>
 
-      {/* Actions */}
       <div className="flex justify-end gap-3 border-t pt-4">
         <Button variant="secondary" type="button" onClick={onCancel}>
           Cancel
