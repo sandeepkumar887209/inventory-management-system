@@ -25,11 +25,15 @@ export function CreateRental() {
   }, []);
 
   const loadData = async () => {
-    const c = await api.get("/customers/customers");
-    const l = await api.get("/inventory/laptops/?status=AVAILABLE");
+    try {
+      const c = await api.get("/customers/customers");
+      const l = await api.get("/inventory/laptops/?status=AVAILABLE");
 
-    setCustomers(c.data.results || c.data);
-    setLaptops(l.data.results || l.data);
+      setCustomers(c.data.results || c.data);
+      setLaptops(l.data.results || l.data);
+    } catch (error) {
+      console.error("Load error:", error);
+    }
   };
 
   const filteredCustomers = customers.filter((c) =>
@@ -96,19 +100,26 @@ export function CreateRental() {
         subtotal: subtotal,
         total_amount: total,
         items: selectedLaptops.map((l) => ({
-          laptop: l.id,
+          laptop_id: l.id,   // 🔥 THIS IS THE FIX
           rent_price: l.discounted_price,
         })),
       };
+
+      console.log("Sending Payload:", payload);
 
       await api.post("/rentals/rental/", payload);
 
       alert("Rental Created Successfully ✅");
 
-      navigate("/rentals/rental");
+      navigate("/rentals");
+
     } catch (error: any) {
-      console.error(error.response?.data || error);
-      alert("Error creating rental");
+      console.error("Backend Error:", error.response?.data);
+      alert(
+        error.response?.data
+          ? JSON.stringify(error.response.data)
+          : "Error creating rental"
+      );
     } finally {
       setLoading(false);
     }
@@ -119,7 +130,6 @@ export function CreateRental() {
 
       <h2 className="text-2xl font-bold text-center">Create Rental</h2>
 
-      {/* STEP 1 CUSTOMER */}
       {step === 1 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Step 1: Select Customer</h3>
@@ -144,15 +154,9 @@ export function CreateRental() {
                 }`}
               >
                 <div className="font-semibold text-lg">{c.name}</div>
-                <div className="text-sm text-neutral-600">
-                  📞 {c.phone}
-                </div>
-                <div className="text-sm text-neutral-600">
-                  ✉ {c.email}
-                </div>
-                <div className="text-sm text-neutral-600">
-                  🏢 {c.company}
-                </div>
+                <div className="text-sm text-neutral-600">📞 {c.phone}</div>
+                <div className="text-sm text-neutral-600">✉ {c.email}</div>
+                <div className="text-sm text-neutral-600">🏢 {c.company}</div>
               </div>
             ))}
           </div>
@@ -165,7 +169,6 @@ export function CreateRental() {
         </div>
       )}
 
-      {/* STEP 2 LAPTOP */}
       {step === 2 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Step 2: Select Laptop(s)</h3>
@@ -211,7 +214,6 @@ export function CreateRental() {
         </div>
       )}
 
-      {/* STEP 3 PRICING */}
       {step === 3 && (
         <div className="space-y-6">
           <h3 className="text-lg font-semibold">Step 3: Pricing</h3>
@@ -260,7 +262,6 @@ export function CreateRental() {
         </div>
       )}
 
-      {/* STEP 4 INVOICE */}
       {step === 4 && (
         <div className="space-y-6 bg-neutral-50 p-6 rounded border">
 
