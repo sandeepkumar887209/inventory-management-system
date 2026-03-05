@@ -45,7 +45,7 @@ export function RentalDetail() {
         </div>
 
         <div>
-          <strong>Expected Return:</strong> {rental.expected_return_date}
+          <strong>Rent Start Date:</strong> {rental.rent_date}
         </div>
 
         <hr />

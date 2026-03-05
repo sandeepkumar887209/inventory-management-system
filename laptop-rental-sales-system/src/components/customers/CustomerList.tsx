@@ -40,22 +40,38 @@ export function CustomerList({
   const itemsPerPage = 10;
 
   /* ================= FETCH CUSTOMERS ================= */
-  useEffect(() => {
-    setLoading(true);
-    setError("");
+  const fetchCustomers = async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-    api
-      .get("/customers/customers/")
-      .then((res) => {
-        const data = res.data.results || res.data;
-        setCustomers(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Failed to load customers.");
-        setLoading(false);
-      });
+      const res = await api.get("/customers/customers/");
+      const data = res.data.results || res.data;
+
+      setCustomers(data);
+    } catch (err) {
+      setError("Failed to load customers.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
   }, []);
+
+  /* ================= DELETE CUSTOMER ================= */
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this customer?"))
+      return;
+
+    try {
+      await api.delete(`/customers/customers/${id}/`);
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      alert("Failed to delete customer");
+    }
+  };
 
   /* ================= FILTER LOGIC ================= */
   const filteredCustomers = customers.filter((c) => {
@@ -75,6 +91,7 @@ export function CustomerList({
   /* ================= PAGINATION ================= */
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
+
   const paginatedCustomers = filteredCustomers.slice(
     startIndex,
     startIndex + itemsPerPage
@@ -103,8 +120,7 @@ export function CustomerList({
           </p>
         </div>
         <Button onClick={onAddNew}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Customer
+                   ✚ Add Customer
         </Button>
       </div>
 
@@ -226,13 +242,21 @@ export function CustomerList({
                     {formatDate(c.created_at)}
                   </td>
 
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 flex gap-2">
                     <Button
                       size="sm"
                       variant="secondary"
                       onClick={() => onViewDetails(c)}
                     >
                       View
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => handleDelete(c.id)}
+                    >
+                      Delete
                     </Button>
                   </td>
                 </tr>

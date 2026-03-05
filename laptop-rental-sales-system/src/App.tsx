@@ -1,8 +1,8 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route, Outlet, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import api from "./services/axios";
 
-/* Layout UI */
+/* Layout */
 import { Sidebar } from "./components/layout/Sidebar";
 import { Header } from "./components/layout/Header";
 import { Modal } from "./components/common/Modal";
@@ -18,17 +18,32 @@ import { CreateRental } from "./components/rentals/CreateRental";
 import { RentalDetail } from "./components/rentals/RentalDetail";
 import { RentalReturn } from "./components/rentals/RentalReturn";
 import { RentalReplacement } from "./components/rentals/RentalReplacement";
+import { CustomerList } from "./components/customers/CustomerList";
+import { CustomerDetail } from "./components/customers/CustomerDetail";
+import { CustomerForm } from "./components/customers/CustomerForm";
+
+import { SalesList } from "./components/sales/SalesList";
+import { SaleDetail } from "./components/sales/SaleDetail";
+import { CreateSale } from "./components/sales/CreateSale";
 
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<"laptop" | "rental" | null>(null);
+
+  const [modalType, setModalType] = useState<
+    "laptop" | "rental" | "sale" | null
+  >(null);
+
   const [editingItem, setEditingItem] = useState<any>(null);
-  const [refreshKey, setRefreshKey] = useState(0); // 🔥 KEY PART
+
+  const [refreshKey, setRefreshKey] = useState(0);
   const [rentalRefreshKey, setRentalRefreshKey] = useState(0);
+  const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
 
+  const navigate = useNavigate();
 
-  const openModal = (type: "laptop" | "rental", item?: any) => {
+  const openModal = (type: "laptop" | "rental" | "sale", item?: any) => {
     setModalType(type);
     setEditingItem(item || null);
     setModalOpen(true);
@@ -49,118 +64,160 @@ export default function App() {
       }
 
       closeModal();
-      setRefreshKey((k) => k + 1); // 🔥 FORCE INVENTORY REFRESH
-    } catch (err: any) {
-      console.error(err.response?.data);
+      setRefreshKey((k) => k + 1);
+    } catch {
       alert("Failed to save laptop");
     }
   };
 
-  const handleRentalSubmit = async (data: any) => {
-    try {
-      await api.post("/rentals/", data); // adjust endpoint if needed
-      closeModal();
-      setRentalRefreshKey((k) => k + 1);
-    } catch (err: any) {
-      console.error(err.response?.data);
-      alert("Failed to create rental");
-    }
-  };
-
-
   return (
-    <BrowserRouter>
+    <>
       <Routes>
+
+        {/* LOGIN */}
         <Route path="/login" element={<Login />} />
 
+        {/* PROTECTED ROUTES */}
         <Route element={<RequireAuth />}>
-          <Route
-            path="/"
-            element={
-              <Layout sidebarCollapsed={sidebarCollapsed} toggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}>
-                <Dashboard />
-              </Layout>
-            }
-          />
 
+          <Route
+            element={
+              <Layout
+                sidebarCollapsed={sidebarCollapsed}
+                toggleSidebar={() =>
+                  setSidebarCollapsed(!sidebarCollapsed)
+                }
+              />
+            }
+          >
+
+            <Route path="/" element={<Dashboard />} />
+
+            {/* INVENTORY */}
+            <Route
+              path="/inventory"
+              element={
+                <InventoryList
+                  refreshKey={refreshKey}
+                  onAddNew={() => openModal("laptop")}
+                  onEdit={(item) => openModal("laptop", item)}
+                  onView={() => {}}
+                />
+              }
+            />
+
+            {/* SALES */}
+            <Route
+              path="/sales"
+              element={
+                <SalesList
+                  onCreateNew={() => navigate("/sales/new")}
+                  onViewInvoice={(sale) =>
+                    navigate(`/sales/${sale.id}`)
+                  }
+                />
+              }
+            />
+            <Route path="/sales/new" element={<CreateSale />} />
+
+            <Route path="/sales/:id" element={<SaleDetail />} />
+
+            {/* RENTALS */}
+            <Route
+              path="/rentals"
+              element={
+                <RentalList
+                  refreshKey={rentalRefreshKey}
+                  onCreateNew={() => openModal("rental")}
+                />
+              }
+            />
+
+            <Route path="/rentals/:id" element={<RentalDetail />} />
             <Route path="/rental-return" element={<RentalReturn />} />
             <Route path="/rental-replacement" element={<RentalReplacement />} />
 
-
-
-          <Route
-              path="/inventory"
+            {/* CUSTOMERS */}
+            <Route
+              path="/customers"
               element={
-                <Layout
-                  sidebarCollapsed={sidebarCollapsed}
-                  toggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-                >
-                  <InventoryList
-                    refreshKey={refreshKey}   // ✅ PASS AS PROP
-                    onAddNew={() => openModal("laptop")}
-                    onEdit={(item) => openModal("laptop", item)}
-                    onView={() => {}}
-                  />
-                </Layout>
-              }
-          />
-          <Route path="/rentals/:id" element={<RentalDetail />} />
-
-          <Route
-            path="/rentals"
-            element={
-              <Layout sidebarCollapsed={sidebarCollapsed} toggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}>
-                <RentalList
-                    refreshKey={rentalRefreshKey}
-                    onCreateNew={() => openModal("rental")}
+                <CustomerList
+                  key={customerRefreshKey}
+                  onAddNew={() => navigate("/customers/new")}
+                  onViewDetails={(c) =>
+                    navigate(`/customers/${c.id}`)
+                  }
                 />
+              }
+            />
 
-              </Layout>
-            }
-          />
+            <Route
+              path="/customers/new"
+              element={
+                <CustomerForm
+                  onSuccess={() => {
+                    setCustomerRefreshKey((k) => k + 1);
+                    navigate("/customers");
+                  }}
+                />
+              }
+            />
+
+            <Route
+              path="/customers/:id"
+              element={<CustomerDetail />}
+            />
+
+          </Route>
         </Route>
+
       </Routes>
 
+      {/* MODAL */}
       <Modal
-          isOpen={modalOpen}
-          onClose={closeModal}
-          title={
-            modalType === "laptop"
-              ? editingItem
-                ? "Edit Laptop"
-                : "Add Laptop"
-              : "Create Rental"
-          }
-        >
-          {/* Laptop Form */}
-          {modalType === "laptop" && (
-            <LaptopForm
-              laptop={editingItem}
-              onSubmit={handleLaptopSubmit}
-              onCancel={closeModal}
-            />
-          )}
+        isOpen={modalOpen}
+        onClose={closeModal}
+        title={
+          modalType === "laptop"
+            ? editingItem
+              ? "Edit Laptop"
+              : "Add Laptop"
+            : "Create Rental"
+        }
+      >
 
-          {/* Rental Form */}
-          {modalType === "rental" && (
-            <CreateRental
-              onSubmit={() => {
-                closeModal();
-                setRefreshKey((k) => k + 1);
-              }}
-              onCancel={closeModal}
-            />
-          )}
+        {modalType === "laptop" && (
+          <LaptopForm
+            laptop={editingItem}
+            onSubmit={handleLaptopSubmit}
+            onCancel={closeModal}
+          />
+        )}
+
+        {modalType === "rental" && (
+          <CreateRental
+            onSubmit={() => {
+              closeModal();
+              setRentalRefreshKey((k) => k + 1);
+            }}
+            onCancel={closeModal}
+          />
+        )}
+
       </Modal>
-
-    </BrowserRouter>
+    </>
   );
 }
 
-function Layout({ children, sidebarCollapsed, toggleSidebar }: any) {
+function Layout({ sidebarCollapsed, toggleSidebar }: any) {
   return (
     <div className="min-h-screen bg-neutral-50">
-      <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
+
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
+      />
+
       <Header
         sidebarCollapsed={sidebarCollapsed}
         userName="Admin"
@@ -170,9 +227,17 @@ function Layout({ children, sidebarCollapsed, toggleSidebar }: any) {
           window.location.href = "/login";
         }}
       />
-      <main className={`pt-16 transition-all ${sidebarCollapsed ? "ml-20" : "ml-64"}`}>
-        <div className="p-6">{children}</div>
+
+      <main
+        className={`pt-16 transition-all ${
+          sidebarCollapsed ? "ml-20" : "ml-64"
+        }`}
+      >
+        <div className="p-6">
+          <Outlet />
+        </div>
       </main>
+
     </div>
   );
 }

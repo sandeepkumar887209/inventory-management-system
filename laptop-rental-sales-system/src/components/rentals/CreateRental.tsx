@@ -80,50 +80,58 @@ export function CreateRental() {
   const total = subtotal + gstAmount;
 
   const handleSubmit = async () => {
-    if (!selectedCustomer) {
-      alert("Please select customer");
-      return;
-    }
+  if (!selectedCustomer) {
+    alert("Please select customer");
+    return;
+  }
 
-    if (selectedLaptops.length === 0) {
-      alert("Please select at least one laptop");
-      return;
-    }
+  if (selectedLaptops.length === 0) {
+    alert("Please select at least one laptop");
+    return;
+  }
 
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const payload = {
-        customer: selectedCustomer.id,
-        expected_return_date: new Date().toISOString().split("T")[0],
-        gst: gst,
-        subtotal: subtotal,
-        total_amount: total,
-        items: selectedLaptops.map((l) => ({
-          laptop_id: l.id,   // 🔥 THIS IS THE FIX
-          rent_price: l.discounted_price,
-        })),
-      };
+    const payload = {
+      customer: selectedCustomer.id,
+      expected_return_date: new Date().toISOString().split("T")[0],
+      gst: gst,
+      subtotal: subtotal,
+      total_amount: total,
+      items: selectedLaptops.map((l) => ({
+        laptop_id: l.id,
+        rent_price: l.discounted_price,
+      })),
+    };
 
-      console.log("Sending Payload:", payload);
+    console.log("Sending Payload:", payload);
 
-      await api.post("/rentals/rental/", payload);
+    const response = await api.post("/rentals/rental/", payload);
 
+    if (response.status === 201 || response.status === 200) {
       alert("Rental Created Successfully ✅");
 
-      navigate("/rentals");
+      // 🔥 Important fix
+      navigate("/rentals", { replace: true });
 
-    } catch (error: any) {
-      console.error("Backend Error:", error.response?.data);
-      alert(
-        error.response?.data
-          ? JSON.stringify(error.response.data)
-          : "Error creating rental"
-      );
-    } finally {
-      setLoading(false);
+      // Optional extra safety (forces refresh)
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     }
-  };
+
+  } catch (error: any) {
+    console.error("Backend Error:", error.response?.data);
+    alert(
+      error.response?.data
+        ? JSON.stringify(error.response.data)
+        : "Error creating rental"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="bg-white p-6 rounded-xl border space-y-6 max-w-5xl mx-auto">
