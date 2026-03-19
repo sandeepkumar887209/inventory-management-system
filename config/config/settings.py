@@ -48,9 +48,10 @@ INSTALLED_APPS = [
     'apps.customers',
     'apps.rentals',
     'apps.sales',
-    "apps.stock",
     "apps.dashboard",
+    "apps.invoices",
     "corsheaders",
+    "apps.crm",
 
 ]
 
@@ -85,7 +86,8 @@ TEMPLATES = [
         },
     },
 ]
-
+# DEFAULT_FROM_EMAIL = 'accounts@ditel.co.in'
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 WSGI_APPLICATION = 'config.wsgi.application'
 
 

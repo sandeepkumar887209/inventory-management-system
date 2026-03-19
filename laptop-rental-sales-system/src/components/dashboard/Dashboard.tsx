@@ -1,286 +1,429 @@
-import React from 'react';
-import { 
-  Laptop, 
-  Calendar, 
-  ShoppingCart, 
-  DollarSign, 
-  TrendingUp, 
+import React, { useEffect, useState } from "react";
+import api from "../../services/axios";
+
+import {
+  Laptop,
+  Calendar,
+  ShoppingCart,
+  DollarSign,
+  Users,
+  TrendingUp,
   AlertTriangle,
-  Package,
-  CheckCircle,
-  Users
-} from 'lucide-react';
-import { Badge } from '../common/Badge';
-import { 
-  LineChart, 
-  Line, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+  BarChart3,
+  Activity,
+  Cpu,
+  Boxes,
+  Brain
+} from "lucide-react";
+
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
   ResponsiveContainer,
   Legend
-} from 'recharts';
+} from "recharts";
+
+import { Badge } from "../common/Badge";
 
 export function Dashboard() {
-  // Mock data
-  const stats = [
-    {
-      id: 1,
-      title: 'Total Laptops',
-      value: '248',
-      change: '+12',
-      changeType: 'positive' as const,
-      icon: Laptop,
-      color: 'bg-blue-500'
-    },
-    {
-      id: 2,
-      title: 'On Rent',
-      value: '156',
-      change: '+8',
-      changeType: 'positive' as const,
-      icon: Calendar,
-      color: 'bg-green-500'
-    },
-    {
-      id: 3,
-      title: 'Sold This Month',
-      value: '42',
-      change: '+15',
-      changeType: 'positive' as const,
-      icon: ShoppingCart,
-      color: 'bg-purple-500'
-    },
-    {
-      id: 4,
-      title: 'Monthly Revenue',
-      value: '₹4.2L',
-      change: '+23%',
-      changeType: 'positive' as const,
-      icon: DollarSign,
-      color: 'bg-orange-500'
+
+  const [loading,setLoading]=useState(true)
+
+  const [stats,setStats]=useState<any>({})
+  const [revenue,setRevenue]=useState<any[]>([])
+  const [brands,setBrands]=useState<any[]>([])
+  const [statusData,setStatusData]=useState<any[]>([])
+  const [alerts,setAlerts]=useState<any[]>([])
+  const [activity,setActivity]=useState<any[]>([])
+  const [predictions,setPredictions]=useState<any>({})
+
+  useEffect(()=>{
+    loadDashboard()
+  },[])
+
+  const loadDashboard = async () => {
+
+    try{
+
+      const [
+        laptopsRes,
+        salesRes,
+        rentalsRes,
+        customersRes
+      ] = await Promise.all([
+        api.get("/inventory/laptops/"),
+        api.get("/sales/sale/"),
+        api.get("/rentals/rental/"),
+        api.get("/customers/customers/")
+      ])
+
+      const laptops = laptopsRes.data.results || laptopsRes.data
+      const sales = salesRes.data.results || salesRes.data
+      const rentals = rentalsRes.data.results || rentalsRes.data
+      const customers = customersRes.data.results || customersRes.data
+
+      /* =========================
+         BASIC STATS
+      ========================= */
+
+      const total = laptops.length
+      const available = laptops.filter((l:any)=>l.status==="AVAILABLE").length
+      const rented = laptops.filter((l:any)=>l.status==="RENTED").length
+      const sold = laptops.filter((l:any)=>l.status==="SOLD").length
+
+      const salesRevenue = sales.reduce((s:number,a:any)=>s+Number(a.total_amount||0),0)
+      const rentalRevenue = rentals.reduce((s:number,a:any)=>s+Number(a.total_rent||0),0)
+
+      const profit = salesRevenue*0.25 + rentalRevenue*0.40
+
+      setStats({
+        total,
+        available,
+        rented,
+        sold,
+        customers:customers.length,
+        salesRevenue,
+        rentalRevenue,
+        profit
+      })
+
+      /* =========================
+         STATUS DISTRIBUTION
+      ========================= */
+
+      setStatusData([
+        {name:"Available",value:available},
+        {name:"Rented",value:rented},
+        {name:"Sold",value:sold}
+      ])
+
+      /* =========================
+         BRAND ANALYTICS
+      ========================= */
+
+      const brandMap:any = {}
+
+      laptops.forEach((l:any)=>{
+        if(!brandMap[l.brand]){
+          brandMap[l.brand]=0
+        }
+        brandMap[l.brand]+=1
+      })
+
+      const brandData = Object.keys(brandMap).map(b=>({
+        brand:b,
+        count:brandMap[b]
+      }))
+
+      setBrands(brandData)
+
+      /* =========================
+         MONTHLY REVENUE
+      ========================= */
+
+      const monthMap:any={}
+
+      sales.forEach((s:any)=>{
+        const m=new Date(s.created_at)
+        const key=m.toLocaleString("default",{month:"short"})
+        if(!monthMap[key]) monthMap[key]={month:key,sales:0,rentals:0}
+        monthMap[key].sales+=Number(s.total_amount||0)
+      })
+
+      rentals.forEach((r:any)=>{
+        const m=new Date(r.created_at)
+        const key=m.toLocaleString("default",{month:"short"})
+        if(!monthMap[key]) monthMap[key]={month:key,sales:0,rentals:0}
+        monthMap[key].rentals+=Number(r.total_rent||0)
+      })
+
+      setRevenue(Object.values(monthMap))
+
+      /* =========================
+         RENTAL ALERTS
+      ========================= */
+
+      const rentalAlerts:any[]=[]
+
+      rentals.forEach((r:any)=>{
+        if(!r.end_date) return
+        const diff=Math.ceil((new Date(r.end_date).getTime()-Date.now())/(1000*3600*24))
+        if(diff<=5){
+          rentalAlerts.push({
+            customer:r.customer_detail?.name,
+            days:diff
+          })
+        }
+      })
+
+      setAlerts(rentalAlerts)
+
+      /* =========================
+         RECENT ACTIVITY
+      ========================= */
+
+      const act:any[]=[]
+
+      sales.slice(0,5).forEach((s:any)=>{
+        act.push({
+          text:`Laptop sold to ${s.customer_detail?.name}`,
+          value:s.total_amount,
+          type:"sale"
+        })
+      })
+
+      rentals.slice(0,5).forEach((r:any)=>{
+        act.push({
+          text:`Rental created for ${r.customer_detail?.name}`,
+          value:r.total_rent,
+          type:"rental"
+        })
+      })
+
+      setActivity(act)
+
+      /* =========================
+         AI PREDICTIONS
+      ========================= */
+
+      const avgSales = salesRevenue/12
+      const avgRent = rentalRevenue/12
+
+      setPredictions({
+        nextMonthSales:Math.round(avgSales*1.15),
+        nextMonthRentals:Math.round(avgRent*1.20),
+        inventoryDemand:rented>available?"High":"Normal"
+      })
+
+      setLoading(false)
+
+    }catch(e){
+      console.log(e)
     }
-  ];
 
-  const revenueData = [
-    { month: 'Jan', rental: 280000, sales: 150000 },
-    { month: 'Feb', rental: 320000, sales: 180000 },
-    { month: 'Mar', rental: 290000, sales: 220000 },
-    { month: 'Apr', rental: 350000, sales: 190000 },
-    { month: 'May', rental: 380000, sales: 250000 },
-    { month: 'Jun', rental: 420000, sales: 280000 }
-  ];
+  }
 
-  const utilizationData = [
-    { category: 'Available', count: 92 },
-    { category: 'Rented', count: 156 },
-    { category: 'Maintenance', count: 18 },
-    { category: 'Sold', count: 42 }
-  ];
+  if(loading){
+    return <div className="p-10">Loading Dashboard...</div>
+  }
 
-  const expiringRentals = [
-    { id: 1, customer: 'TechCorp Solutions', laptop: 'Dell XPS 15', endDate: '2026-02-10', daysLeft: 2 },
-    { id: 2, customer: 'Startup Hub', laptop: 'MacBook Pro 14"', endDate: '2026-02-12', daysLeft: 4 },
-    { id: 3, customer: 'John Smith', laptop: 'HP EliteBook 840', endDate: '2026-02-13', daysLeft: 5 },
-    { id: 4, customer: 'Design Studio', laptop: 'Lenovo ThinkPad X1', endDate: '2026-02-15', daysLeft: 7 }
-  ];
+  return(
 
-  const recentActivity = [
-    { id: 1, action: 'New rental order', customer: 'ABC Technologies', time: '10 minutes ago', type: 'rental' },
-    { id: 2, action: 'Laptop sold', customer: 'Jane Doe', time: '1 hour ago', type: 'sale' },
-    { id: 3, action: 'Rental returned', customer: 'XYZ Corp', time: '2 hours ago', type: 'return' },
-    { id: 4, action: 'New customer registered', customer: 'Tech Innovators', time: '3 hours ago', type: 'customer' }
-  ];
-
-  return (
     <div className="space-y-6">
-      {/* Page Header */}
+
+      {/* HEADER */}
+
       <div>
-        <h1 className="text-2xl font-bold text-neutral-900 mb-1">Dashboard</h1>
-        <p className="text-neutral-600">Welcome back! Here's what's happening today.</p>
+        <h1 className="text-2xl font-bold">AI Business Dashboard</h1>
+        <p className="text-neutral-600">ERP analytics for laptop rental business</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center`}>
-                  <Icon className="w-6 h-6 text-white" />
-                </div>
-                <span className={`text-sm font-medium ${
-                  stat.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {stat.change}
-                </span>
-              </div>
-              <h3 className="text-2xl font-bold text-neutral-900 mb-1">{stat.value}</h3>
-              <p className="text-sm text-neutral-600">{stat.title}</p>
-            </div>
-          );
-        })}
+      {/* KPI GRID */}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+
+        <StatCard icon={Laptop} title="Total Inventory" value={stats.total}/>
+        <StatCard icon={Calendar} title="Active Rentals" value={stats.rented}/>
+        <StatCard icon={ShoppingCart} title="Sales Revenue" value={`₹${stats.salesRevenue}`}/>
+        <StatCard icon={DollarSign} title="Profit" value={`₹${Math.round(stats.profit)}`}/>
+        <StatCard icon={Users} title="Customers" value={stats.customers}/>
+        <StatCard icon={Boxes} title="Available Laptops" value={stats.available}/>
+        <StatCard icon={Activity} title="Sold Laptops" value={stats.sold}/>
+        <StatCard icon={Cpu} title="Rental Revenue" value={`₹${stats.rentalRevenue}`}/>
+
       </div>
 
-      {/* Charts Row */}
+      {/* CHARTS */}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-neutral-900">Revenue Trend</h3>
-              <p className="text-sm text-neutral-600">Last 6 months</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-green-600" />
-              <span className="text-sm font-medium text-green-600">+23.5%</span>
-            </div>
-          </div>
+
+        {/* Revenue */}
+
+        <div className="bg-white p-6 rounded-xl shadow border">
+
+          <h3 className="font-semibold mb-4">Revenue Trend</h3>
+
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="month" stroke="#6b7280" fontSize={12} />
-              <YAxis stroke="#6b7280" fontSize={12} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px'
-                }}
-                formatter={(value: number) => `₹${(value / 1000).toFixed(0)}K`}
-              />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="rental" 
-                stroke="#3b82f6" 
-                strokeWidth={2}
-                name="Rental Revenue"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="sales" 
-                stroke="#8b5cf6" 
-                strokeWidth={2}
-                name="Sales Revenue"
-              />
+            <LineChart data={revenue}>
+              <CartesianGrid strokeDasharray="3 3"/>
+              <XAxis dataKey="month"/>
+              <YAxis/>
+              <Tooltip/>
+              <Legend/>
+              <Line type="monotone" dataKey="sales" stroke="#7c3aed"/>
+              <Line type="monotone" dataKey="rentals" stroke="#3b82f6"/>
             </LineChart>
           </ResponsiveContainer>
+
         </div>
 
-        {/* Utilization Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-neutral-900">Laptop Utilization</h3>
-            <p className="text-sm text-neutral-600">Current inventory status</p>
-          </div>
+        {/* Inventory Status */}
+
+        <div className="bg-white p-6 rounded-xl shadow border">
+
+          <h3 className="font-semibold mb-4">Inventory Status</h3>
+
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={utilizationData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="category" stroke="#6b7280" fontSize={12} />
-              <YAxis stroke="#6b7280" fontSize={12} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px'
-                }}
-              />
-              <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-            </BarChart>
+            <PieChart>
+              <Pie
+                data={statusData}
+                dataKey="value"
+                nameKey="name"
+                outerRadius={100}
+              >
+                <Cell fill="#3b82f6"/>
+                <Cell fill="#10b981"/>
+                <Cell fill="#8b5cf6"/>
+              </Pie>
+              <Tooltip/>
+            </PieChart>
           </ResponsiveContainer>
+
         </div>
+
       </div>
 
-      {/* Alerts and Activity */}
+      {/* BRAND ANALYTICS */}
+
+      <div className="bg-white p-6 rounded-xl shadow border">
+
+        <h3 className="font-semibold mb-4">Brand Distribution</h3>
+
+        <ResponsiveContainer width="100%" height={300}>
+
+          <BarChart data={brands}>
+            <CartesianGrid strokeDasharray="3 3"/>
+            <XAxis dataKey="brand"/>
+            <YAxis/>
+            <Tooltip/>
+            <Bar dataKey="count" fill="#2563eb"/>
+          </BarChart>
+
+        </ResponsiveContainer>
+
+      </div>
+
+      {/* ALERTS + ACTIVITY */}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Expiring Rentals */}
-        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+
+        <div className="bg-white p-6 rounded-xl shadow border">
+
           <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-5 h-5 text-orange-600" />
-            <h3 className="text-lg font-semibold text-neutral-900">Expiring Rentals</h3>
+            <AlertTriangle className="text-orange-500"/>
+            <h3 className="font-semibold">Rental Alerts</h3>
           </div>
-          <div className="space-y-3">
-            {expiringRentals.map((rental) => (
-              <div key={rental.id} className="flex items-start justify-between p-3 bg-neutral-50 rounded-lg">
-                <div className="flex-1">
-                  <p className="font-medium text-neutral-900">{rental.customer}</p>
-                  <p className="text-sm text-neutral-600">{rental.laptop}</p>
-                  <p className="text-xs text-neutral-500 mt-1">Ends: {rental.endDate}</p>
-                </div>
-                <Badge variant={rental.daysLeft <= 3 ? 'danger' : 'warning'} size="sm">
-                  {rental.daysLeft}d left
-                </Badge>
-              </div>
-            ))}
-          </div>
-          <button className="w-full mt-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-            View All Rentals
-          </button>
+
+          {alerts.length===0 && <p>No alerts</p>}
+
+          {alerts.map((a,i)=>(
+            <div key={i} className="flex justify-between border-b py-2">
+              <span>{a.customer}</span>
+              <Badge variant="danger">{a.days} days</Badge>
+            </div>
+          ))}
+
         </div>
 
-        {/* Recent Activity */}
-        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-semibold text-neutral-900">Recent Activity</h3>
-          </div>
-          <div className="space-y-3">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-3 p-3 hover:bg-neutral-50 rounded-lg transition-colors">
-                <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                  activity.type === 'rental' ? 'bg-blue-500' :
-                  activity.type === 'sale' ? 'bg-purple-500' :
-                  activity.type === 'return' ? 'bg-green-500' :
-                  'bg-orange-500'
-                }`} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-neutral-900">{activity.action}</p>
-                  <p className="text-sm text-neutral-600">{activity.customer}</p>
-                  <p className="text-xs text-neutral-500 mt-1">{activity.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button className="w-full mt-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-            View All Activity
-          </button>
+        <div className="bg-white p-6 rounded-xl shadow border">
+
+          <h3 className="font-semibold mb-4">Recent Activity</h3>
+
+          {activity.map((a,i)=>(
+            <div key={i} className="flex justify-between border-b py-2">
+              <span>{a.text}</span>
+              <Badge variant="success">₹{a.value}</Badge>
+            </div>
+          ))}
+
         </div>
+
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-sm p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <Package className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">63%</span>
-          </div>
-          <h4 className="font-semibold mb-1">Utilization Rate</h4>
-          <p className="text-sm opacity-90">156 out of 248 laptops on rent</p>
+      {/* AI PREDICTIONS */}
+
+      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-xl">
+
+        <div className="flex items-center gap-2 mb-4">
+          <Brain/>
+          <h3 className="font-semibold">AI Business Insights</h3>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-sm p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <DollarSign className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">₹28K</span>
-          </div>
-          <h4 className="font-semibold mb-1">Avg. Monthly Rent</h4>
-          <p className="text-sm opacity-90">Per laptop rental income</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          <InsightCard
+            title="Next Month Sales Forecast"
+            value={`₹${predictions.nextMonthSales}`}
+          />
+
+          <InsightCard
+            title="Next Month Rental Forecast"
+            value={`₹${predictions.nextMonthRentals}`}
+          />
+
+          <InsightCard
+            title="Inventory Demand"
+            value={predictions.inventoryDemand}
+          />
+
         </div>
 
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-sm p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <Users className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">184</span>
-          </div>
-          <h4 className="font-semibold mb-1">Active Customers</h4>
-          <p className="text-sm opacity-90">42 corporate, 142 individual</p>
-        </div>
       </div>
+
     </div>
-  );
+
+  )
+
+}
+
+/* =======================
+   STAT CARD
+======================= */
+
+function StatCard({icon:Icon,title,value}:any){
+
+  return(
+    <div className="bg-white p-6 rounded-xl shadow border flex justify-between">
+
+      <div>
+        <p className="text-sm text-gray-500">{title}</p>
+        <h2 className="text-2xl font-bold">{value}</h2>
+      </div>
+
+      <Icon className="w-8 h-8 text-blue-600"/>
+
+    </div>
+  )
+
+}
+
+/* =======================
+   AI INSIGHT CARD
+======================= */
+
+function InsightCard({title,value}:any){
+
+  return(
+
+    <div className="bg-white bg-opacity-20 p-4 rounded-lg">
+
+      <p className="text-sm opacity-80">{title}</p>
+
+      <h3 className="text-xl font-bold">
+        {value}
+      </h3>
+
+    </div>
+
+  )
+
 }

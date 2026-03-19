@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Bell, User, LogOut, Settings, ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Bell, User, LogOut, Settings, ChevronDown, UserCog } from 'lucide-react';
 
 interface HeaderProps {
   sidebarCollapsed: boolean;
@@ -8,25 +9,27 @@ interface HeaderProps {
   onLogout: () => void;
 }
 
-export function Header({ sidebarCollapsed, userName = 'John Doe', userRole = 'Admin', onLogout }: HeaderProps) {
-  const [showUserMenu, setShowUserMenu] = useState(false);
+export function Header({ sidebarCollapsed, userName = 'Admin', userRole = 'Administrator', onLogout }: HeaderProps) {
+  const navigate = useNavigate();
+  const [showUserMenu,      setShowUserMenu]      = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
   const notifications = [
-    { id: 1, text: '3 rentals expiring this week', time: '2h ago', unread: true },
-    { id: 2, text: 'New customer registration', time: '5h ago', unread: true },
-    { id: 3, text: 'Low stock alert: Dell XPS 15', time: '1d ago', unread: false },
+    { id: 1, text: '3 rentals expiring this week', time: '2h ago',  unread: true  },
+    { id: 2, text: 'New customer registration',    time: '5h ago',  unread: true  },
+    { id: 3, text: 'Low stock alert: Dell XPS 15', time: '1d ago',  unread: false },
   ];
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
   return (
-    <header 
+    <header
       className={`fixed top-0 right-0 h-16 bg-white border-b border-neutral-200 transition-all duration-300 z-30 ${
         sidebarCollapsed ? 'left-20' : 'left-64'
       }`}
     >
       <div className="h-full flex items-center justify-between px-6">
+
         {/* Search */}
         <div className="flex-1 max-w-2xl">
           <div className="relative">
@@ -41,6 +44,7 @@ export function Header({ sidebarCollapsed, userName = 'John Doe', userRole = 'Ad
 
         {/* Right side */}
         <div className="flex items-center gap-4">
+
           {/* Notifications */}
           <div className="relative">
             <button
@@ -56,7 +60,6 @@ export function Header({ sidebarCollapsed, userName = 'John Doe', userRole = 'Ad
               )}
             </button>
 
-            {/* Notifications dropdown */}
             {showNotifications && (
               <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-neutral-200 py-2">
                 <div className="px-4 py-2 border-b border-neutral-200">
@@ -103,32 +106,57 @@ export function Header({ sidebarCollapsed, userName = 'John Doe', userRole = 'Ad
               <ChevronDown className="w-4 h-4 text-neutral-400 hidden lg:block" />
             </button>
 
-            {/* User dropdown */}
             {showUserMenu && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-neutral-200 py-2">
+              <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-lg shadow-lg border border-neutral-200 py-2">
+
+                {/* User info */}
                 <div className="px-4 py-2 border-b border-neutral-200">
                   <div className="font-medium text-neutral-900">{userName}</div>
                   <div className="text-sm text-neutral-500">{userRole}</div>
                 </div>
-                <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-neutral-50 text-neutral-700">
+
+                {/* Profile */}
+                <button
+                  onClick={() => { navigate('/profile'); setShowUserMenu(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-2 hover:bg-neutral-50 text-neutral-700"
+                >
                   <User className="w-4 h-4" />
-                  <span className="text-sm">Profile</span>
+                  <span className="text-sm">My Profile</span>
                 </button>
-                <button className="w-full flex items-center gap-3 px-4 py-2 hover:bg-neutral-50 text-neutral-700">
+
+                {/* Users & Roles */}
+                <button
+                  onClick={() => { navigate('/users'); setShowUserMenu(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-2 hover:bg-neutral-50 text-neutral-700"
+                >
+                  <UserCog className="w-4 h-4" />
+                  <span className="text-sm">Users & Roles</span>
+                </button>
+
+                {/* Settings */}
+                <button
+                  onClick={() => { navigate('/settings'); setShowUserMenu(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-2 hover:bg-neutral-50 text-neutral-700"
+                >
                   <Settings className="w-4 h-4" />
                   <span className="text-sm">Settings</span>
                 </button>
+
                 <div className="border-t border-neutral-200 my-2"></div>
-                <button 
+
+                {/* Logout */}
+                <button
                   onClick={onLogout}
                   className="w-full flex items-center gap-3 px-4 py-2 hover:bg-neutral-50 text-red-600"
                 >
                   <LogOut className="w-4 h-4" />
                   <span className="text-sm">Logout</span>
                 </button>
+
               </div>
             )}
           </div>
+
         </div>
       </div>
     </header>
