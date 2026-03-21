@@ -59,6 +59,7 @@ class Laptop(AuditModel):
     purchased_from      = models.CharField(max_length=150, blank=True)   # kept for legacy
     purchase_date       = models.DateField(null=True, blank=True)
     purchase_price      = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    cost_to_company     = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     warranty_expiry     = models.DateField(null=True, blank=True)
     invoice_number      = models.CharField(max_length=100, blank=True)
     condition           = models.CharField(max_length=20, choices=CONDITION_CHOICES, default="NEW")
