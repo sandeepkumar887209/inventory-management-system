@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, User, LogOut, Settings, ChevronDown, UserCog } from 'lucide-react';
+import { Bell, User, LogOut, Settings, ChevronDown, UserCog } from 'lucide-react';
 
 interface HeaderProps {
   sidebarCollapsed: boolean;
-  userName?: string;
+  userName: string;   // ✅ now required
   userRole?: string;
   onLogout: () => void;
 }
 
-export function Header({ sidebarCollapsed, userName = 'Admin', userRole = 'Administrator', onLogout }: HeaderProps) {
+export function Header({ sidebarCollapsed, userName, userRole = 'User', onLogout }: HeaderProps) {
   const navigate = useNavigate();
   const [showUserMenu,      setShowUserMenu]      = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -30,17 +30,8 @@ export function Header({ sidebarCollapsed, userName = 'Admin', userRole = 'Admin
     >
       <div className="h-full flex items-center justify-between px-6">
 
-        {/* Search */}
-        <div className="flex-1 max-w-2xl">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-            <input
-              type="text"
-              placeholder="Search laptops, customers, orders..."
-              className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        </div>
+        {/* Left empty space (since search removed) */}
+        <div></div>
 
         {/* Right side */}
         <div className="flex items-center gap-4">

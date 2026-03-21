@@ -17,11 +17,7 @@ import { InventoryList }     from "./components/inventory/InventoryList";
 import { LaptopForm }        from "./components/inventory/LaptopForm";
 import { LaptopDetail }      from "./components/inventory/LaptopDetail";
 import { SupplierPage }      from "./components/inventory/SupplierPage";
-import { RentalList }        from "./components/rentals/RentalList";
-import { CreateRental }      from "./components/rentals/CreateRental";
-import { RentalDetail }      from "./components/rentals/RentalDetail";
-import { RentalReturn }      from "./components/rentals/RentalReturn";
-import { RentalReplacement } from "./components/rentals/RentalReplacement";
+import { RentalModule }      from "./components/rentals/RentalModule";
 import { CustomerList }      from "./components/customers/CustomerList";
 import { CustomerDetail }    from "./components/customers/CustomerDetail";
 import { CustomerForm }      from "./components/customers/CustomerForm";
@@ -48,17 +44,16 @@ function ComingSoon({ title }: { title: string }) {
 }
 
 export default function App() {
-  const [sidebarCollapsed,    setSidebarCollapsed]    = useState(false);
-  const [modalOpen,           setModalOpen]           = useState(false);
-  const [modalType,           setModalType]           = useState<"laptop" | "rental" | null>(null);
-  const [editingItem,         setEditingItem]         = useState<any>(null);
-  const [refreshKey,          setRefreshKey]          = useState(0);
-  const [rentalRefreshKey,    setRentalRefreshKey]    = useState(0);
-  const [customerRefreshKey,  setCustomerRefreshKey]  = useState(0);
+  const [sidebarCollapsed,   setSidebarCollapsed]   = useState(false);
+  const [modalOpen,          setModalOpen]          = useState(false);
+  const [modalType,          setModalType]          = useState<"laptop" | null>(null);
+  const [editingItem,        setEditingItem]        = useState<any>(null);
+  const [refreshKey,         setRefreshKey]         = useState(0);
+  const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
 
   const navigate = useNavigate();
 
-  const openModal = (type: "laptop" | "rental", item?: any) => {
+  const openModal = (type: "laptop", item?: any) => {
     setModalType(type);
     setEditingItem(item || null);
     setModalOpen(true);
@@ -120,19 +115,8 @@ export default function App() {
             <Route path="/inventory/:id"       element={<LaptopDetail />} />
             <Route path="/inventory/suppliers" element={<SupplierPage />} />
 
-            {/* Rentals */}
-            <Route
-              path="/rentals"
-              element={
-                <RentalList
-                  refreshKey={rentalRefreshKey}
-                  onCreateNew={() => openModal("rental")}
-                />
-              }
-            />
-            <Route path="/rentals/:id"        element={<RentalDetail />} />
-            <Route path="/rental-return"       element={<RentalReturn />} />
-            <Route path="/rental-replacement"  element={<RentalReplacement />} />
+            {/* ── Rentals — all handled by RentalModule ── */}
+            <Route path="/rentals/*" element={<RentalModule />} />
 
             {/* Sales */}
             <Route
@@ -180,13 +164,13 @@ export default function App() {
             <Route path="/crm/*" element={<CRMPage />} />
 
             {/* ══ ACCOUNTS ═════════════════════════ */}
-            <Route path="/accounts"           element={<ComingSoon title="Accounts Dashboard" />} />
-            <Route path="/accounts/invoices"  element={<ComingSoon title="Billing Invoices" />} />
-            <Route path="/accounts/payments"  element={<ComingSoon title="Payment Tracking" />} />
-            <Route path="/accounts/ledger"    element={<ComingSoon title="Customer Ledger" />} />
-            <Route path="/accounts/reports"   element={<ComingSoon title="Financial Reports" />} />
+            <Route path="/accounts"          element={<ComingSoon title="Accounts Dashboard" />} />
+            <Route path="/accounts/invoices" element={<ComingSoon title="Billing Invoices" />} />
+            <Route path="/accounts/payments" element={<ComingSoon title="Payment Tracking" />} />
+            <Route path="/accounts/ledger"   element={<ComingSoon title="Customer Ledger" />} />
+            <Route path="/accounts/reports"  element={<ComingSoon title="Financial Reports" />} />
 
-            {/* ══ ADMIN — accessible from header dropdown ══ */}
+            {/* ══ ADMIN ════════════════════════════ */}
             <Route path="/users"    element={<ComingSoon title="Users & Roles" />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile"  element={<ComingSoon title="My Profile" />} />
@@ -196,29 +180,16 @@ export default function App() {
 
       </Routes>
 
-      {/* MODAL */}
+      {/* MODAL — laptop only (rentals now live inside RentalModule) */}
       <Modal
         isOpen={modalOpen}
         onClose={closeModal}
-        title={
-          modalType === "laptop"
-            ? editingItem ? "Edit Laptop" : "Add Laptop"
-            : "Create Rental"
-        }
+        title={editingItem ? "Edit Laptop" : "Add Laptop"}
       >
         {modalType === "laptop" && (
           <LaptopForm
             laptop={editingItem}
             onSubmit={handleLaptopSubmit}
-            onCancel={closeModal}
-          />
-        )}
-        {modalType === "rental" && (
-          <CreateRental
-            onSubmit={() => {
-              closeModal();
-              setRentalRefreshKey((k) => k + 1);
-            }}
             onCancel={closeModal}
           />
         )}

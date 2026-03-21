@@ -1,204 +1,284 @@
-import React, { useEffect, useState } from "react";
-import { Plus, Search } from "lucide-react";
-import { Badge } from "../common/Badge";
-import { Button } from "../common/Button";
+import React, { useEffect, useState, useCallback } from "react";
+import { Search, Plus } from "lucide-react";
 import api from "../../services/axios";
-import { useNavigate } from "react-router-dom";
+import {
+  Card, CardHeader, SectionTitle, Btn, Input, Table,
+  statusBadge, Badge, Spinner, fmtDate, fmtINR, daysDiff, C,
+} from "./ui";
 
-interface RentalListProps {
-  refreshKey: number;
-  onCreateNew: () => void;
-}
+const STATUS_FILTERS = [
+  { key: "ALL",      label: "All"      },
+  { key: "ONGOING",  label: "Ongoing"  },
+  { key: "RETURNED", label: "Returned" },
+  { key: "REPLACED", label: "Replaced" },
+];
 
-export function RentalList({ refreshKey, onCreateNew }: RentalListProps) {
-  const [rentals, setRentals] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const navigate = useNavigate();
+const PAGE_SIZE = 12;
 
-  useEffect(() => {
-    fetchRentals();
-    fetchCustomers();
-  }, [refreshKey]);
+export function RentalList({ onNavigate }) {
+  const [rentals,  setRentals]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [search,   setSearch]   = useState("");
+  const [filter,   setFilter]   = useState("ALL");
+  const [page,     setPage]     = useState(1);
+
+  useEffect(() => { fetchRentals(); }, []);
 
   const fetchRentals = async () => {
     try {
+      setLoading(true);
       const res = await api.get("/rentals/rental/");
-      const data = Array.isArray(res.data)
-        ? res.data
-        : res.data.results || [];
+      const data = Array.isArray(res.data) ? res.data : res.data.results || [];
       setRentals(data);
-    } catch (error) {
-      console.error("Rental fetch error:", error);
+    } catch (err) {
+      console.error("Rentals fetch error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const fetchCustomers = async () => {
-    try {
-      const res = await api.get("/customers/customers/");
-      const data = Array.isArray(res.data)
-        ? res.data
-        : res.data.results || [];
-      setCustomers(data);
-    } catch (error) {
-      console.error("Customer fetch error:", error);
-    }
-  };
-
-  const getCustomerName = (customerId: number) => {
-    const customer = customers.find((c) => c.id === customerId);
-    return customer ? customer.name : "N/A";
-  };
-
-  const filteredRentals = rentals.filter((rental) => {
-    const customerName = String(
-      rental.customer_detail?.name || getCustomerName(rental.customer)
-    ).toLowerCase();
-
-    const matchesSearch = customerName.includes(
-      searchTerm.toLowerCase()
-    );
-
-    const matchesStatus =
-      statusFilter === "ALL"
-        ? true
-        : rental.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
+  /* Overdue detection */
+  const withOverdue = rentals.map((r) => {
+    if (r.status !== "ONGOING" || !r.expected_return_date) return r;
+    const diff = daysDiff(r.expected_return_date);
+    return diff !== null && diff < 0 ? { ...r, _overdue: true } : r;
   });
 
-  const getStatusBadge = (status: string) => {
-    if (status === "ONGOING") {
-      return <Badge variant="success">Ongoing</Badge>;
-    }
-    if (status === "RETURNED") {
-      return <Badge variant="info">Returned</Badge>;
-    }
-    if (status === "REPLACED") {
-      return <Badge variant="warning">Replaced</Badge>;
-    }
-    return <Badge>{status}</Badge>;
-  };
+  const filtered = withOverdue.filter((r) => {
+    const q   = search.toLowerCase();
+    const name = (r.customer_detail?.name ?? "").toLowerCase();
+    const matchSearch = !q || name.includes(q) || String(r.id).includes(q);
+
+    let matchStatus = filter === "ALL" || r.status === filter;
+    if (filter === "ONGOING" && r._overdue) matchStatus = true;
+
+    return matchSearch && matchStatus;
+  });
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const columns = [
+    {
+      key:    "id",
+      label:  "Rental ID",
+      render: (r) => (
+        <span style={{ fontFamily: "monospace", fontSize: "12px", color: "#888" }}>
+          R-{r.id}
+        </span>
+      ),
+    },
+    {
+      key:    "customer",
+      label:  "Customer",
+      render: (r) => (
+        <div>
+          <div style={{ fontWeight: 500 }}>{r.customer_detail?.name ?? "—"}</div>
+          <div style={{ fontSize: "11px", color: "#999", marginTop: "2px" }}>
+            {r.customer_detail?.phone ?? ""}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key:    "laptops",
+      label:  "Laptops",
+      render: (r) => (
+        <span style={{ color: "#555" }}>
+          {r.items_detail?.length ?? 0} unit{(r.items_detail?.length ?? 0) !== 1 ? "s" : ""}
+        </span>
+      ),
+    },
+    {
+      key:    "start",
+      label:  "Start date",
+      render: (r) => (
+        <span style={{ fontSize: "12px", color: "#888" }}>{fmtDate(r.rent_date ?? r.created_at)}</span>
+      ),
+    },
+    {
+      key:    "due",
+      label:  "Expected return",
+      render: (r) => {
+        if (!r.expected_return_date) return <span style={{ color: "#ccc" }}>—</span>;
+        const diff = daysDiff(r.expected_return_date);
+        const isOverdue = r.status === "ONGOING" && diff !== null && diff < 0;
+        return (
+          <span
+            style={{
+              fontSize:   "12px",
+              color:      isOverdue ? C.red.text : diff !== null && diff <= 3 ? C.amber.text : "#888",
+              fontWeight: isOverdue ? 500 : 400,
+            }}
+          >
+            {fmtDate(r.expected_return_date)}
+            {isOverdue && (
+              <span
+                style={{
+                  marginLeft: "6px",
+                  fontSize:   "10px",
+                  background: C.red.bg,
+                  color:      C.red.text,
+                  padding:    "1px 6px",
+                  borderRadius: "99px",
+                }}
+              >
+                {Math.abs(diff)}d overdue
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      key:    "total",
+      label:  "Total",
+      render: (r) => (
+        <span style={{ fontWeight: 500 }}>{fmtINR(r.total_amount)}</span>
+      ),
+    },
+    {
+      key:    "status",
+      label:  "Status",
+      render: (r) =>
+        r._overdue ? <Badge color="red">Overdue</Badge> : statusBadge(r.status),
+    },
+    {
+      key:    "actions",
+      label:  "",
+      render: (r) => (
+        <Btn size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onNavigate(`/rentals/${r.id}`); }}>
+          View
+        </Btn>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-
-      <div className="flex items-center justify-between">
+    <div>
+      {/* Header */}
+      <div
+        style={{
+          display:        "flex",
+          alignItems:     "center",
+          justifyContent: "space-between",
+          marginBottom:   "20px",
+        }}
+      >
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900 mb-1">
-            Rental Management
+          <h1 style={{ fontSize: "22px", fontWeight: 600, color: "#1a1a1a", margin: 0 }}>
+            All Rentals
           </h1>
-          <p className="text-neutral-600">
-            {filteredRentals.length} rentals
+          <p style={{ fontSize: "13px", color: "#999", marginTop: "4px" }}>
+            {filtered.length} rental{filtered.length !== 1 ? "s" : ""}
           </p>
         </div>
+        <Btn variant="primary" onClick={() => onNavigate("/rentals/new")}>
+          <Plus size={14} /> New rental
+        </Btn>
+      </div>
 
-        <div className="flex gap-3">
-          <Button onClick={onCreateNew}>
-            ✚ New Rental
-          </Button>
+      {/* Filters */}
+      <div
+        style={{
+          background:    "#fff",
+          border:        "1px solid #ebebeb",
+          borderRadius:  "12px",
+          padding:       "14px 16px",
+          marginBottom:  "16px",
+          display:       "flex",
+          alignItems:    "center",
+          gap:           "12px",
+          flexWrap:      "wrap",
+        }}
+      >
+        {/* Search */}
+        <div style={{ position: "relative", flex: "1", minWidth: "200px" }}>
+          <Search
+            size={14}
+            color="#aaa"
+            style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)" }}
+          />
+          <input
+            placeholder="Search customer name or rental ID..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            style={{
+              width:        "100%",
+              padding:      "8px 12px 8px 32px",
+              border:       "1px solid #e0deda",
+              borderRadius: "8px",
+              fontSize:     "13px",
+              color:        "#1a1a1a",
+              background:   "#fafaf8",
+              outline:      "none",
+              boxSizing:    "border-box",
+            }}
+          />
+        </div>
 
-          <Button onClick={() => navigate("/rental-return")}>
-            🔁 Rental Return
-          </Button>
-
-          <Button onClick={() => navigate("/rental-replacement")}>
-            🔄 Replacement
-          </Button>
+        {/* Status chips */}
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => { setFilter(f.key); setPage(1); }}
+              style={{
+                padding:      "6px 14px",
+                borderRadius: "99px",
+                border:       filter === f.key ? "none" : "1px solid #e0deda",
+                background:   filter === f.key ? "#1a6ef5" : "#fff",
+                color:        filter === f.key ? "#fff" : "#555",
+                fontSize:     "12px",
+                fontWeight:   filter === f.key ? 500 : 400,
+                cursor:       "pointer",
+                transition:   "all 0.15s",
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-4">
-        <div className="flex gap-4">
+      {/* Table */}
+      <Card>
+        {loading ? (
+          <Spinner />
+        ) : (
+          <Table
+            columns={columns}
+            rows={paginated}
+            onRowClick={(r) => onNavigate(`/rentals/${r.id}`)}
+          />
+        )}
+      </Card>
 
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-            <input
-              type="text"
-              placeholder="Search by customer name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div
+          style={{
+            display:        "flex",
+            justifyContent: "space-between",
+            alignItems:     "center",
+            marginTop:      "12px",
+            fontSize:       "12px",
+            color:          "#999",
+          }}
+        >
+          <span>
+            Page {page} of {totalPages} · {filtered.length} rentals
+          </span>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <Btn variant="ghost" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+              Prev
+            </Btn>
+            <Btn variant="ghost" size="sm" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
+              Next
+            </Btn>
           </div>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-neutral-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="ALL">All Status</option>
-            <option value="ONGOING">Ongoing</option>
-            <option value="RETURNED">Returned</option>
-            <option value="REPLACED">Replaced</option>
-          </select>
-
         </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-neutral-50 border-b border-neutral-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase">ID</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase">Customer</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase">Laptops</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase">Total Amount</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-neutral-600 uppercase">Created</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-neutral-200">
-              {filteredRentals.map((rental) => (
-                <tr key={rental.id} className="hover:bg-neutral-50">
-                  <td className="px-6 py-4">
-                    <button
-                      onClick={() => navigate(`/rentals/${rental.id}`)}
-                      className="text-blue-600 hover:underline font-medium"
-                    >
-                      {rental.id}
-                    </button>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    {rental.customer_detail?.name || getCustomerName(rental.customer)}
-                  </td>
-
-                  <td className="px-6 py-4">
-                    {rental.items_detail?.length || 0}{" "}
-                    {(rental.items_detail?.length || 0) === 1
-                      ? "Laptop"
-                      : "Laptops"}
-                  </td>
-
-                  <td className="px-6 py-4">
-                    {getStatusBadge(rental.status)}
-                  </td>
-
-                  <td className="px-6 py-4 font-medium">
-                    ₹{rental.total_amount}
-                  </td>
-
-                  <td className="px-6 py-4">
-                    {new Date(rental.created_at).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-
-              {filteredRentals.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-6 text-center text-neutral-500">
-                    No rentals found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

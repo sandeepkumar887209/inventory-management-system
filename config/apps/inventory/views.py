@@ -25,7 +25,7 @@ class SupplierViewSet(AuditModelViewSet):
 
 
 class LaptopViewSet(AuditModelViewSet):
-    queryset           = Laptop.objects.all().order_by("-id")
+    queryset           = Laptop.objects.all().order_by("-created_at")
     serializer_class   = LaptopSerializer
     permission_classes = [IsStaffOrAdmin]
     filter_backends    = [filters.OrderingFilter, filters.SearchFilter]
@@ -51,17 +51,16 @@ class LaptopViewSet(AuditModelViewSet):
             qs = qs.filter(customer_id=customer_id)
         if condition:
             qs = qs.filter(condition=condition.upper())
-
         return qs
 
-    # ── NEVER allow delete ─────────────────────────────
+    # ── Laptops are never deleted ─────────────────────────────────────────────
     def destroy(self, request, *args, **kwargs):
         return Response(
             {"error": "Laptops cannot be deleted. Use 'Return to Supplier' or 'Write Off' instead."},
             status=status.HTTP_405_METHOD_NOT_ALLOWED,
         )
 
-    # ── Return to supplier ────────────────────────────
+    # ── Return to supplier ────────────────────────────────────────────────────
     @action(detail=True, methods=["post"], url_path="return-to-supplier")
     @transaction.atomic
     def return_to_supplier(self, request, pk=None):
@@ -71,67 +70,84 @@ class LaptopViewSet(AuditModelViewSet):
         if laptop.status == "RETURNED_TO_SUPPLIER":
             return Response({"error": "Already returned to supplier."}, status=400)
 
-        old_status     = laptop.status
-        laptop.status  = "RETURNED_TO_SUPPLIER"
-        laptop.customer = None
-        laptop.save()
+        old_status = laptop.status
 
+        # Create stock movement first — signal will update laptop.status
         StockMovement.objects.create(
-            laptop=laptop, movement_type="SUPPLIER_RETURN",
-            quantity=1, remarks=remarks, created_by=request.user
+            laptop=laptop,
+            movement_type="SUPPLIER_RETURN",
+            quantity=1,
+            remarks=remarks,
+            created_by=request.user,
         )
-        LaptopHistory.objects.create(
-            laptop=laptop, action="RETURNED_TO_SUPPLIER",
-            from_status=old_status, to_status="RETURNED_TO_SUPPLIER",
-            remarks=remarks, created_by=request.user
+
+        # Reload and also write an explicit history entry with the user attached
+        laptop.refresh_from_db()
+        LaptopHistory.objects.get_or_create(
+            laptop=laptop,
+            action="RETURNED_TO_SUPPLIER",
+            from_status=old_status,
+            to_status="RETURNED_TO_SUPPLIER",
+            defaults={"remarks": remarks, "created_by": request.user},
         )
+
         return Response({"message": "Laptop returned to supplier."})
 
-    # ── Send for maintenance ──────────────────────────
+    # ── Send for maintenance ──────────────────────────────────────────────────
     @action(detail=True, methods=["post"], url_path="send-maintenance")
     @transaction.atomic
     def send_maintenance(self, request, pk=None):
         laptop  = self.get_object()
         remarks = request.data.get("remarks", "")
-
-        old_status    = laptop.status
-        laptop.status = "UNDER_MAINTENANCE"
-        laptop.save()
+        old_status = laptop.status
 
         StockMovement.objects.create(
-            laptop=laptop, movement_type="MAINTENANCE_OUT",
-            quantity=1, remarks=remarks, created_by=request.user
+            laptop=laptop,
+            movement_type="MAINTENANCE_OUT",
+            quantity=1,
+            remarks=remarks,
+            created_by=request.user,
         )
-        LaptopHistory.objects.create(
-            laptop=laptop, action="SENT_FOR_MAINTENANCE",
-            from_status=old_status, to_status="UNDER_MAINTENANCE",
-            remarks=remarks, created_by=request.user
+
+        laptop.refresh_from_db()
+        LaptopHistory.objects.get_or_create(
+            laptop=laptop,
+            action="SENT_FOR_MAINTENANCE",
+            from_status=old_status,
+            to_status="UNDER_MAINTENANCE",
+            defaults={"remarks": remarks, "created_by": request.user},
         )
+
         return Response({"message": "Laptop sent for maintenance."})
 
-    # ── Return from maintenance ───────────────────────
+    # ── Return from maintenance ───────────────────────────────────────────────
     @action(detail=True, methods=["post"], url_path="return-from-maintenance")
     @transaction.atomic
     def return_from_maintenance(self, request, pk=None):
         laptop  = self.get_object()
         remarks = request.data.get("remarks", "")
-
-        old_status    = laptop.status
-        laptop.status = "AVAILABLE"
-        laptop.save()
+        old_status = laptop.status
 
         StockMovement.objects.create(
-            laptop=laptop, movement_type="MAINTENANCE_IN",
-            quantity=1, remarks=remarks, created_by=request.user
+            laptop=laptop,
+            movement_type="MAINTENANCE_IN",
+            quantity=1,
+            remarks=remarks,
+            created_by=request.user,
         )
-        LaptopHistory.objects.create(
-            laptop=laptop, action="MAINTENANCE_DONE",
-            from_status=old_status, to_status="AVAILABLE",
-            remarks=remarks, created_by=request.user
+
+        laptop.refresh_from_db()
+        LaptopHistory.objects.get_or_create(
+            laptop=laptop,
+            action="MAINTENANCE_DONE",
+            from_status=old_status,
+            to_status="AVAILABLE",
+            defaults={"remarks": remarks, "created_by": request.user},
         )
+
         return Response({"message": "Laptop returned from maintenance."})
 
-    # ── Write off ─────────────────────────────────────
+    # ── Write off ─────────────────────────────────────────────────────────────
     @action(detail=True, methods=["post"], url_path="write-off")
     @transaction.atomic
     def write_off(self, request, pk=None):
@@ -141,37 +157,42 @@ class LaptopViewSet(AuditModelViewSet):
         if laptop.status == "WRITTEN_OFF":
             return Response({"error": "Already written off."}, status=400)
 
-        old_status    = laptop.status
-        laptop.status = "WRITTEN_OFF"
-        laptop.customer = None
-        laptop.save()
+        old_status = laptop.status
 
         StockMovement.objects.create(
-            laptop=laptop, movement_type="WRITTEN_OFF",
-            quantity=1, remarks=remarks, created_by=request.user
+            laptop=laptop,
+            movement_type="WRITTEN_OFF",
+            quantity=1,
+            remarks=remarks,
+            created_by=request.user,
         )
-        LaptopHistory.objects.create(
-            laptop=laptop, action="WRITTEN_OFF",
-            from_status=old_status, to_status="WRITTEN_OFF",
-            remarks=remarks, created_by=request.user
+
+        laptop.refresh_from_db()
+        LaptopHistory.objects.get_or_create(
+            laptop=laptop,
+            action="WRITTEN_OFF",
+            from_status=old_status,
+            to_status="WRITTEN_OFF",
+            defaults={"remarks": remarks, "created_by": request.user},
         )
+
         return Response({"message": "Laptop written off."})
 
-    # ── History ───────────────────────────────────────
+    # ── History endpoint ──────────────────────────────────────────────────────
     @action(detail=True, methods=["get"], url_path="history")
     def history(self, request, pk=None):
         laptop  = self.get_object()
-        history = laptop.history.all().order_by("-created_at")
+        history = LaptopHistory.objects.filter(laptop=laptop).order_by("-created_at")
         return Response(LaptopHistorySerializer(history, many=True).data)
 
-    # ── Stock movements ───────────────────────────────
+    # ── Stock movements endpoint ──────────────────────────────────────────────
     @action(detail=True, methods=["get"], url_path="movements")
     def movements(self, request, pk=None):
         laptop    = self.get_object()
-        movements = laptop.movements.all().order_by("-created_at")
+        movements = StockMovement.objects.filter(laptop=laptop).order_by("-created_at")
         return Response(StockMovementSerializer(movements, many=True).data)
 
-    # ── Dashboard stats ───────────────────────────────
+    # ── Stats endpoint ────────────────────────────────────────────────────────
     @action(detail=False, methods=["get"], url_path="stats")
     def stats(self, request):
         qs = Laptop.objects.all()

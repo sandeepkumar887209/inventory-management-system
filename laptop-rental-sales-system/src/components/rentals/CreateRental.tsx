@@ -1,329 +1,560 @@
 import React, { useEffect, useState } from "react";
-import { Button } from "../common/Button";
+import { Check, ChevronRight } from "lucide-react";
 import api from "../../services/axios";
-import { useNavigate } from "react-router-dom";
+import { Btn, Input, Select, Card, fmtINR, C } from "./ui";
 
-export function CreateRental() {
-  const navigate = useNavigate();
+/* ── Step indicator ── */
+function StepBar({ step, total }) {
+  const steps = ["Customer", "Laptops", "Pricing", "Confirm"];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0", marginBottom: "32px" }}>
+      {steps.map((label, i) => {
+        const num       = i + 1;
+        const done      = num < step;
+        const active    = num === step;
+        return (
+          <React.Fragment key={label}>
+            <div style={{ display: "flex", alignItems: "center", flexDirection: "column", gap: "6px" }}>
+              <div
+                style={{
+                  width:        "30px",
+                  height:       "30px",
+                  borderRadius: "50%",
+                  display:      "flex",
+                  alignItems:   "center",
+                  justifyContent:"center",
+                  fontSize:     "12px",
+                  fontWeight:   500,
+                  background:   done ? C.teal.solid : active ? C.blue.solid : "#f0eeeb",
+                  color:        done || active ? "#fff" : "#aaa",
+                  transition:   "all 0.2s",
+                }}
+              >
+                {done ? <Check size={13} /> : num}
+              </div>
+              <span style={{ fontSize: "11px", color: active ? "#1a1a1a" : "#aaa", whiteSpace: "nowrap" }}>
+                {label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div
+                style={{
+                  flex:        1,
+                  height:      "1px",
+                  background:  done ? C.teal.solid : "#e8e6e1",
+                  marginBottom:"18px",
+                  marginLeft:  "4px",
+                  marginRight: "4px",
+                  transition:  "background 0.2s",
+                }}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
 
-  const [step, setStep] = useState(1);
+/* ── Customer card ── */
+function CustomerCard({ c, selected, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding:      "12px 14px",
+        border:       selected ? `1.5px solid ${C.blue.solid}` : "1px solid #e8e6e1",
+        borderRadius: "10px",
+        cursor:       "pointer",
+        background:   selected ? C.blue.bg : "#fff",
+        display:      "flex",
+        justifyContent: "space-between",
+        alignItems:   "center",
+        transition:   "all 0.15s",
+      }}
+    >
+      <div>
+        <div style={{ fontWeight: 500, fontSize: "13px" }}>{c.name}</div>
+        <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
+          {c.phone}{c.email ? ` · ${c.email}` : ""}
+        </div>
+      </div>
+      {selected && (
+        <div
+          style={{
+            width: "20px", height: "20px", borderRadius: "50%",
+            background: C.blue.solid, display: "flex",
+            alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <Check size={11} color="#fff" />
+        </div>
+      )}
+    </div>
+  );
+}
 
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [laptops, setLaptops] = useState<any[]>([]);
+/* ── Laptop card ── */
+function LaptopCard({ l, selected, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding:      "12px 14px",
+        border:       selected ? `1.5px solid ${C.blue.solid}` : "1px solid #e8e6e1",
+        borderRadius: "10px",
+        cursor:       "pointer",
+        background:   selected ? C.blue.bg : "#fff",
+        display:      "flex",
+        justifyContent: "space-between",
+        alignItems:   "center",
+        transition:   "all 0.15s",
+      }}
+    >
+      <div>
+        <div style={{ fontWeight: 500, fontSize: "13px" }}>
+          {l.brand} {l.model}
+        </div>
+        <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
+          {l.serial_number} · {l.processor} · {l.ram} · {l.storage}
+        </div>
+        <div style={{ fontSize: "11px", color: C.teal.text, marginTop: "2px" }}>
+          {fmtINR(l.rent_per_month)}/month
+        </div>
+      </div>
+      <div
+        style={{
+          width: "20px", height: "20px", borderRadius: "50%",
+          border: selected ? "none" : "1.5px solid #d0cec9",
+          background: selected ? C.blue.solid : "transparent",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        {selected && <Check size={11} color="#fff" />}
+      </div>
+    </div>
+  );
+}
 
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [laptopSearch, setLaptopSearch] = useState("");
+export function CreateRental({ onSuccess, onCancel }) {
+  const [step,            setStep]            = useState(1);
+  const [customers,       setCustomers]       = useState([]);
+  const [laptops,         setLaptops]         = useState([]);
+  const [customerSearch,  setCustomerSearch]  = useState("");
+  const [laptopSearch,    setLaptopSearch]    = useState("");
+  const [selectedCustomer,setSelectedCustomer]= useState(null);
+  const [selectedLaptops, setSelectedLaptops] = useState([]);   // [{ ...laptop, discounted_price }]
+  const [gst,             setGst]             = useState(18);
+  const [loading,         setLoading]         = useState(false);
+  const [submitting,      setSubmitting]      = useState(false);
 
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [selectedLaptops, setSelectedLaptops] = useState<any[]>([]);
-
-  const [gst, setGst] = useState(18);
-  const [loading, setLoading] = useState(false);
-
+  /* Load data */
   useEffect(() => {
-    loadData();
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [cRes, lRes] = await Promise.all([
+          api.get("/customers/customers/"),
+          api.get("/inventory/laptops/?status=AVAILABLE"),
+        ]);
+        setCustomers(Array.isArray(cRes.data) ? cRes.data : cRes.data.results || []);
+        setLaptops(Array.isArray(lRes.data) ? lRes.data : lRes.data.results || []);
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
+    };
+    load();
   }, []);
 
-  const loadData = async () => {
-    try {
-      const c = await api.get("/customers/customers");
-      const l = await api.get("/inventory/laptops/?status=AVAILABLE");
-
-      setCustomers(c.data.results || c.data);
-      setLaptops(l.data.results || l.data);
-    } catch (error) {
-      console.error("Load error:", error);
-    }
-  };
-
+  /* Derived */
   const filteredCustomers = customers.filter((c) =>
-    c.name.toLowerCase().includes(customerSearch.toLowerCase())
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    c.phone.includes(customerSearch)
   );
-
   const filteredLaptops = laptops.filter(
     (l) =>
-      l.brand.toLowerCase().includes(laptopSearch.toLowerCase()) ||
-      l.model.toLowerCase().includes(laptopSearch.toLowerCase())
+      `${l.brand} ${l.model}`.toLowerCase().includes(laptopSearch.toLowerCase()) ||
+      l.serial_number.toLowerCase().includes(laptopSearch.toLowerCase())
   );
 
-  const toggleLaptop = (laptop: any) => {
-    const exists = selectedLaptops.find((l) => l.id === laptop.id);
-
-    if (exists) {
-      setSelectedLaptops(selectedLaptops.filter((l) => l.id !== laptop.id));
-    } else {
-      setSelectedLaptops([
-        ...selectedLaptops,
-        {
-          ...laptop,
-          actual_price: laptop.rent_per_month,
-          discounted_price: laptop.rent_per_month,
-        },
-      ]);
-    }
+  const toggleLaptop = (laptop) => {
+    setSelectedLaptops((prev) => {
+      const exists = prev.find((x) => x.id === laptop.id);
+      if (exists) return prev.filter((x) => x.id !== laptop.id);
+      return [...prev, { ...laptop, discounted_price: laptop.rent_per_month }];
+    });
   };
 
-  const updateDiscountedPrice = (id: number, value: number) => {
-    setSelectedLaptops(
-      selectedLaptops.map((l) =>
-        l.id === id ? { ...l, discounted_price: value } : l
-      )
+  const updatePrice = (id, val) => {
+    setSelectedLaptops((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, discounted_price: Number(val) } : l))
     );
   };
 
-  const subtotal = selectedLaptops.reduce(
-    (sum, l) => sum + Number(l.discounted_price),
-    0
-  );
+  const subtotal   = selectedLaptops.reduce((s, l) => s + Number(l.discounted_price), 0);
+  const gstAmount  = (subtotal * gst) / 100;
+  const total      = subtotal + gstAmount;
 
-  const gstAmount = (subtotal * gst) / 100;
-  const total = subtotal + gstAmount;
-
+  /* Submit */
   const handleSubmit = async () => {
-  if (!selectedCustomer) {
-    alert("Please select customer");
-    return;
-  }
-
-  if (selectedLaptops.length === 0) {
-    alert("Please select at least one laptop");
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    const payload = {
-      customer: selectedCustomer.id,
-      expected_return_date: new Date().toISOString().split("T")[0],
-      gst: gst,
-      subtotal: subtotal,
-      total_amount: total,
-      items: selectedLaptops.map((l) => ({
-        laptop_id: l.id,
-        rent_price: l.discounted_price,
-      })),
-    };
-
-    console.log("Sending Payload:", payload);
-
-    const response = await api.post("/rentals/rental/", payload);
-
-    if (response.status === 201 || response.status === 200) {
-      alert("Rental Created Successfully ✅");
-
-      // 🔥 Important fix
-      navigate("/rentals", { replace: true });
-
-      // Optional extra safety (forces refresh)
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
+    if (!selectedCustomer || selectedLaptops.length === 0) return;
+    try {
+      setSubmitting(true);
+      await api.post("/rentals/rental/", {
+        customer:             selectedCustomer.id,
+        expected_return_date: new Date(Date.now() + 30 * 86_400_000).toISOString().split("T")[0],
+        gst:                  gst,
+        subtotal,
+        total_amount:         total,
+        items:                selectedLaptops.map((l) => ({
+          laptop_id:  l.id,
+          rent_price: l.discounted_price,
+        })),
+      });
+      onSuccess();
+    } catch (err) {
+      console.error("Create rental error:", err.response?.data);
+      alert(
+        err.response?.data
+          ? JSON.stringify(err.response.data)
+          : "Failed to create rental"
+      );
+    } finally {
+      setSubmitting(false);
     }
+  };
 
-  } catch (error: any) {
-    console.error("Backend Error:", error.response?.data);
-    alert(
-      error.response?.data
-        ? JSON.stringify(error.response.data)
-        : "Error creating rental"
+  if (loading) {
+    return (
+      <div style={{ textAlign: "center", padding: "80px", color: "#bbb" }}>Loading...</div>
     );
-  } finally {
-    setLoading(false);
   }
-};
 
   return (
-    <div className="bg-white p-6 rounded-xl border space-y-6 max-w-5xl mx-auto">
+    <div style={{ maxWidth: "720px" }}>
+      <h1 style={{ fontSize: "22px", fontWeight: 600, color: "#1a1a1a", marginBottom: "24px" }}>
+        New Rental
+      </h1>
 
-      <h2 className="text-2xl font-bold text-center">Create Rental</h2>
+      <StepBar step={step} total={4} />
 
+      {/* ── Step 1: Customer ── */}
       {step === 1 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Step 1: Select Customer</h3>
-
-          <input
-            type="text"
-            placeholder="Search customer..."
+        <div>
+          <div style={{ fontSize: "14px", fontWeight: 500, color: "#1a1a1a", marginBottom: "12px" }}>
+            Select customer
+          </div>
+          <Input
+            placeholder="Search customer by name or phone..."
             value={customerSearch}
             onChange={(e) => setCustomerSearch(e.target.value)}
-            className="border px-3 py-2 rounded w-full"
+            style={{ marginBottom: "12px" }}
           />
-
-          <div className="max-h-80 overflow-y-auto space-y-2">
+          <div
+            style={{
+              maxHeight:  "360px",
+              overflowY:  "auto",
+              display:    "flex",
+              flexDirection: "column",
+              gap:        "8px",
+            }}
+          >
             {filteredCustomers.map((c) => (
-              <div
+              <CustomerCard
                 key={c.id}
+                c={c}
+                selected={selectedCustomer?.id === c.id}
                 onClick={() => setSelectedCustomer(c)}
-                className={`border p-4 rounded cursor-pointer ${
-                  selectedCustomer?.id === c.id
-                    ? "border-blue-500 bg-blue-50"
-                    : ""
-                }`}
-              >
-                <div className="font-semibold text-lg">{c.name}</div>
-                <div className="text-sm text-neutral-600">📞 {c.phone}</div>
-                <div className="text-sm text-neutral-600">✉ {c.email}</div>
-                <div className="text-sm text-neutral-600">🏢 {c.company}</div>
-              </div>
+              />
             ))}
+            {filteredCustomers.length === 0 && (
+              <div style={{ textAlign: "center", color: "#ccc", padding: "24px", fontSize: "13px" }}>
+                No customers found
+              </div>
+            )}
           </div>
-
-          <div className="flex justify-end">
-            <Button onClick={() => setStep(2)} disabled={!selectedCustomer}>
-              Next
-            </Button>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "24px" }}>
+            <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
+            <Btn
+              variant="primary"
+              onClick={() => setStep(2)}
+              disabled={!selectedCustomer}
+            >
+              Next <ChevronRight size={14} />
+            </Btn>
           </div>
         </div>
       )}
 
+      {/* ── Step 2: Laptops ── */}
       {step === 2 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Step 2: Select Laptop(s)</h3>
-
-          <input
-            type="text"
-            placeholder="Search laptop..."
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 500, color: "#1a1a1a" }}>
+              Select laptops
+            </div>
+            {selectedLaptops.length > 0 && (
+              <span
+                style={{
+                  fontSize: "12px", color: C.blue.text,
+                  background: C.blue.bg, padding: "3px 10px",
+                  borderRadius: "99px",
+                }}
+              >
+                {selectedLaptops.length} selected
+              </span>
+            )}
+          </div>
+          <Input
+            placeholder="Search by brand, model, serial number..."
             value={laptopSearch}
             onChange={(e) => setLaptopSearch(e.target.value)}
-            className="border px-3 py-2 rounded w-full"
+            style={{ marginBottom: "12px" }}
           />
-
-          <div className="max-h-80 overflow-y-auto space-y-2">
+          <div
+            style={{
+              maxHeight:     "360px",
+              overflowY:     "auto",
+              display:       "flex",
+              flexDirection: "column",
+              gap:           "8px",
+            }}
+          >
             {filteredLaptops.map((l) => (
+              <LaptopCard
+                key={l.id}
+                l={l}
+                selected={!!selectedLaptops.find((x) => x.id === l.id)}
+                onClick={() => toggleLaptop(l)}
+              />
+            ))}
+            {filteredLaptops.length === 0 && (
+              <div style={{ textAlign: "center", color: "#ccc", padding: "24px", fontSize: "13px" }}>
+                No available laptops
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "24px" }}>
+            <Btn variant="ghost" onClick={() => setStep(1)}>Back</Btn>
+            <Btn
+              variant="primary"
+              onClick={() => setStep(3)}
+              disabled={selectedLaptops.length === 0}
+            >
+              Next <ChevronRight size={14} />
+            </Btn>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 3: Pricing ── */}
+      {step === 3 && (
+        <div>
+          <div style={{ fontSize: "14px", fontWeight: 500, color: "#1a1a1a", marginBottom: "16px" }}>
+            Adjust pricing
+          </div>
+
+          {/* Laptop rows */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
+            {selectedLaptops.map((l) => (
               <div
                 key={l.id}
-                onClick={() => toggleLaptop(l)}
-                className={`border p-4 rounded cursor-pointer ${
-                  selectedLaptops.find((x) => x.id === l.id)
-                    ? "border-blue-500 bg-blue-50"
-                    : ""
-                }`}
+                style={{
+                  display:       "flex",
+                  alignItems:    "center",
+                  justifyContent:"space-between",
+                  padding:       "12px 16px",
+                  border:        "1px solid #e8e6e1",
+                  borderRadius:  "10px",
+                  gap:           "16px",
+                  background:    "#fff",
+                }}
               >
-                <div className="font-semibold">
-                  {l.brand} {l.model}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 500, fontSize: "13px" }}>
+                    {l.brand} {l.model}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
+                    List price: {fmtINR(l.rent_per_month)}/month
+                  </div>
                 </div>
-                <div className="text-sm text-neutral-600">
-                  Serial: {l.serial_number}
-                </div>
-                <div className="text-sm text-neutral-600">
-                  Rent: ₹{l.rent_per_month}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                  <span style={{ fontSize: "12px", color: "#888" }}>₹</span>
+                  <input
+                    type="number"
+                    value={l.discounted_price}
+                    onChange={(e) => updatePrice(l.id, e.target.value)}
+                    style={{
+                      width:        "100px",
+                      padding:      "6px 10px",
+                      border:       "1px solid #e0deda",
+                      borderRadius: "7px",
+                      fontSize:     "13px",
+                      outline:      "none",
+                      textAlign:    "right",
+                    }}
+                  />
+                  <span style={{ fontSize: "11px", color: "#aaa" }}>/mo</span>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="flex justify-between">
-            <Button onClick={() => setStep(1)}>Previous</Button>
-            <Button onClick={() => setStep(3)} disabled={selectedLaptops.length === 0}>
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="space-y-6">
-          <h3 className="text-lg font-semibold">Step 3: Pricing</h3>
-
-          {selectedLaptops.map((l) => (
-            <div key={l.id} className="border p-4 rounded flex justify-between items-center">
-              <div>
-                <div className="font-medium">
-                  {l.brand} {l.model}
-                </div>
-                <div className="text-sm text-neutral-500">
-                  Actual Price: ₹{l.actual_price}
-                </div>
-              </div>
-
-              <div className="flex flex-col">
-                <label className="text-sm font-medium mb-1">
-                  Discounted Price (₹)
-                </label>
-                <input
-                  type="number"
-                  value={l.discounted_price}
-                  onChange={(e) =>
-                    updateDiscountedPrice(l.id, Number(e.target.value))
-                  }
-                  className="border px-2 py-1 rounded w-40"
-                />
-              </div>
-            </div>
-          ))}
-
-          <div>
-            <label className="font-medium">GST %</label>
-            <input
-              type="number"
+          {/* GST row */}
+          <div
+            style={{
+              display:       "flex",
+              alignItems:    "center",
+              gap:           "12px",
+              marginBottom:  "20px",
+              padding:       "12px 16px",
+              border:        "1px solid #e8e6e1",
+              borderRadius:  "10px",
+              background:    "#fff",
+            }}
+          >
+            <span style={{ fontSize: "13px", color: "#555", flex: 1 }}>GST rate</span>
+            <Select
               value={gst}
               onChange={(e) => setGst(Number(e.target.value))}
-              className="border px-3 py-2 rounded w-full mt-1"
-            />
+              style={{ width: "120px" }}
+            >
+              {[0, 5, 12, 18, 28].map((v) => (
+                <option key={v} value={v}>{v}%</option>
+              ))}
+            </Select>
           </div>
 
-          <div className="flex justify-between">
-            <Button onClick={() => setStep(2)}>Previous</Button>
-            <Button onClick={() => setStep(4)}>Next</Button>
+          {/* Summary box */}
+          <div
+            style={{
+              background:    "#fafaf8",
+              border:        "1px solid #e8e6e1",
+              borderRadius:  "10px",
+              padding:       "14px 16px",
+              fontSize:      "13px",
+              color:         "#555",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+              <span>Subtotal</span>
+              <span>{fmtINR(subtotal)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+              <span>GST ({gst}%)</span>
+              <span>{fmtINR(gstAmount)}</span>
+            </div>
+            <div
+              style={{
+                display:        "flex",
+                justifyContent: "space-between",
+                fontWeight:     600,
+                fontSize:       "14px",
+                color:          "#1a1a1a",
+                paddingTop:     "8px",
+                borderTop:      "1px solid #e8e6e1",
+                marginTop:      "4px",
+              }}
+            >
+              <span>Total</span>
+              <span>{fmtINR(total)}</span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "24px" }}>
+            <Btn variant="ghost" onClick={() => setStep(2)}>Back</Btn>
+            <Btn variant="primary" onClick={() => setStep(4)}>
+              Review <ChevronRight size={14} />
+            </Btn>
           </div>
         </div>
       )}
 
+      {/* ── Step 4: Confirm ── */}
       {step === 4 && (
-        <div className="space-y-6 bg-neutral-50 p-6 rounded border">
-
-          <h3 className="text-xl font-bold text-center">Invoice Preview</h3>
-
-          <div className="space-y-1">
-            <div><strong>Customer:</strong> {selectedCustomer.name}</div>
-            <div><strong>Phone:</strong> {selectedCustomer.phone}</div>
-            <div><strong>Email:</strong> {selectedCustomer.email}</div>
+        <div>
+          <div style={{ fontSize: "14px", fontWeight: 500, color: "#1a1a1a", marginBottom: "16px" }}>
+            Confirm rental
           </div>
 
-          <table className="w-full border mt-4">
-            <thead className="bg-white">
-              <tr>
-                <th className="p-2 text-left">Laptop</th>
-                <th className="p-2 text-left">Actual</th>
-                <th className="p-2 text-left">Discounted</th>
-              </tr>
-            </thead>
-            <tbody>
-              {selectedLaptops.map((l) => (
-                <tr key={l.id} className="border-t">
-                  <td className="p-2">
-                    {l.brand} {l.model}
-                  </td>
-                  <td className="p-2">₹{l.actual_price}</td>
-                  <td className="p-2">₹{l.discounted_price}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="flex justify-between">
-            <span>Subtotal</span>
-            <span>₹{subtotal}</span>
+          {/* Customer info */}
+          <div
+            style={{
+              background:   "#fff",
+              border:       "1px solid #e8e6e1",
+              borderRadius: "10px",
+              padding:      "14px 16px",
+              marginBottom: "12px",
+            }}
+          >
+            <div style={{ fontSize: "11px", color: "#aaa", marginBottom: "4px" }}>CUSTOMER</div>
+            <div style={{ fontWeight: 500, fontSize: "14px" }}>{selectedCustomer?.name}</div>
+            <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>
+              {selectedCustomer?.phone}{selectedCustomer?.email ? ` · ${selectedCustomer.email}` : ""}
+            </div>
           </div>
 
-          <div className="flex justify-between">
-            <span>GST</span>
-            <span>₹{gstAmount}</span>
+          {/* Laptops */}
+          <div
+            style={{
+              background:   "#fff",
+              border:       "1px solid #e8e6e1",
+              borderRadius: "10px",
+              padding:      "14px 16px",
+              marginBottom: "12px",
+            }}
+          >
+            <div style={{ fontSize: "11px", color: "#aaa", marginBottom: "8px" }}>
+              LAPTOPS ({selectedLaptops.length})
+            </div>
+            {selectedLaptops.map((l) => (
+              <div
+                key={l.id}
+                style={{
+                  display:        "flex",
+                  justifyContent: "space-between",
+                  paddingBottom:  "6px",
+                  marginBottom:   "6px",
+                  borderBottom:   "1px solid #f5f4f1",
+                  fontSize:       "13px",
+                }}
+              >
+                <span>{l.brand} {l.model} ({l.serial_number})</span>
+                <span style={{ fontWeight: 500 }}>{fmtINR(l.discounted_price)}/mo</span>
+              </div>
+            ))}
           </div>
 
-          <div className="flex justify-between font-bold text-lg">
-            <span>Total</span>
-            <span>₹{total}</span>
+          {/* Total */}
+          <div
+            style={{
+              background:    C.blue.bg,
+              border:        `1px solid ${C.blue.border}`,
+              borderRadius:  "10px",
+              padding:       "14px 16px",
+              display:       "flex",
+              justifyContent:"space-between",
+              alignItems:    "center",
+              marginBottom:  "24px",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: "12px", color: C.blue.text }}>Total amount</div>
+              <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
+                Subtotal {fmtINR(subtotal)} + GST {fmtINR(gstAmount)}
+              </div>
+            </div>
+            <div style={{ fontSize: "22px", fontWeight: 600, color: C.blue.text }}>
+              {fmtINR(total)}
+            </div>
           </div>
 
-          <div className="flex justify-between mt-4">
-            <Button onClick={() => setStep(3)}>Previous</Button>
-            <Button onClick={handleSubmit} disabled={loading}>
-              {loading ? "Creating..." : "Confirm Rental"}
-            </Button>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Btn variant="ghost" onClick={() => setStep(3)}>Back</Btn>
+            <Btn variant="primary" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? "Creating..." : "Confirm rental"}
+            </Btn>
           </div>
-
         </div>
       )}
     </div>
