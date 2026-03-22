@@ -83,7 +83,7 @@ export function RentalDetail({ onBack }) {
   const rentedItems = rental.items_detail?.filter((i) => i.laptop?.status === "RENTED") ?? [];
 
   return (
-    <div style={{ maxWidth: "800px" }}>
+    <div style={{ width: "100%", boxSizing: "border-box" }}>
       {/* Back */}
       <button
         onClick={onBack}
