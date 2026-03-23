@@ -177,7 +177,7 @@ class LaptopListSerializer(serializers.ModelSerializer):
             "processor", "generation", "ram", "storage",
             "display_size", "os", "color",
             "condition", "status",
-            "price", "rent_per_month", "purchase_price", "purchase_date",
+            "price", "rent_per_month","cost_to_company", "purchase_price", "purchase_date",
             "warranty_expiry", "purchased_from", "supplier_name",
             "customer_detail",
             "created_at",
