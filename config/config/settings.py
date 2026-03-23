@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "apps.invoices",
     "corsheaders",
     "apps.crm",
+    "apps.demo",
 
 ]
 
