@@ -18,62 +18,76 @@ class Supplier(AuditModel):
 
 class Laptop(AuditModel):
     STATUS_CHOICES = (
-        ("AVAILABLE",          "Available"),
-        ("RENTED",             "Rented"),
-        ("SOLD",               "Sold"),
-        ("DEMO",               "Demo"),
-        ("UNDER_MAINTENANCE",  "Under Maintenance"),
+        ("AVAILABLE",            "Available"),
+        ("RENTED",               "Rented"),
+        ("SOLD",                 "Sold"),
+        ("DEMO",                 "Demo"),
+        ("UNDER_MAINTENANCE",    "Under Maintenance"),
         ("RETURNED_TO_SUPPLIER", "Returned to Supplier"),
-        ("WRITTEN_OFF",        "Written Off"),
+        ("WRITTEN_OFF",          "Written Off"),
     )
 
     CONDITION_CHOICES = (
-        ("NEW",       "New"),
-        ("GOOD",      "Good"),
-        ("FAIR",      "Fair"),
-        ("POOR",      "Poor"),
+        ("NEW",  "New"),
+        ("GOOD", "Good"),
+        ("FAIR", "Fair"),
+        ("POOR", "Poor"),
     )
 
     # ── Identity ──────────────────────────────────────
-    asset_tag      = models.CharField(max_length=50, unique=True, blank=True, help_text="Internal asset tag e.g. LT-0001")
-    brand          = models.CharField(max_length=100)
-    model          = models.CharField(max_length=100)
-    serial_number  = models.CharField(max_length=100, unique=True)
+    asset_tag     = models.CharField(
+        max_length=50, unique=True, blank=True,
+        help_text="Internal asset tag e.g. LT-0001",
+    )
+    brand         = models.CharField(max_length=100)
+    model         = models.CharField(max_length=100)
+    serial_number = models.CharField(max_length=100, unique=True)
 
     # ── Specs ─────────────────────────────────────────
-    processor      = models.CharField(max_length=100)
-    generation     = models.CharField(max_length=100)
-    ram            = models.CharField(max_length=50)
-    storage        = models.CharField(max_length=50)
-    display_size   = models.CharField(max_length=20, blank=True, help_text="e.g. 15.6 inch")
-    os             = models.CharField(max_length=100, blank=True, help_text="e.g. Windows 11 Pro")
-    color          = models.CharField(max_length=50, blank=True)
+    processor    = models.CharField(max_length=100)
+    generation   = models.CharField(max_length=100)
+    ram          = models.CharField(max_length=50)
+    storage      = models.CharField(max_length=50)
+    gpu          = models.CharField(
+        max_length=150, blank=True,
+        verbose_name="GPU / Graphics Card",
+        help_text="e.g. NVIDIA GeForce RTX 4060, Intel Iris Xe, AMD Radeon RX 7600M",
+    )
+    display_size = models.CharField(
+        max_length=20, blank=True,
+        help_text="e.g. 15.6 inch",
+    )
+    os    = models.CharField(
+        max_length=100, blank=True,
+        help_text="e.g. Windows 11 Pro",
+    )
+    color = models.CharField(max_length=50, blank=True)
 
     # ── Purchase ──────────────────────────────────────
-    supplier            = models.ForeignKey(
+    supplier = models.ForeignKey(
         Supplier,
         on_delete=models.SET_NULL,
         null=True, blank=True,
-        related_name="laptops"
+        related_name="laptops",
     )
-    purchased_from      = models.CharField(max_length=150, blank=True)   # kept for legacy
-    purchase_date       = models.DateField(null=True, blank=True)
-    purchase_price      = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    cost_to_company     = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    warranty_expiry     = models.DateField(null=True, blank=True)
-    invoice_number      = models.CharField(max_length=100, blank=True)
-    condition           = models.CharField(max_length=20, choices=CONDITION_CHOICES, default="NEW")
+    purchased_from  = models.CharField(max_length=150, blank=True)   # kept for legacy
+    purchase_date   = models.DateField(null=True, blank=True)
+    purchase_price  = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    cost_to_company = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    warranty_expiry = models.DateField(null=True, blank=True)
+    invoice_number  = models.CharField(max_length=100, blank=True)
+    condition       = models.CharField(max_length=20, choices=CONDITION_CHOICES, default="NEW")
 
     # ── Pricing ───────────────────────────────────────
-    price          = models.DecimalField(max_digits=10, decimal_places=2)        # sale price
+    price          = models.DecimalField(max_digits=10, decimal_places=2)   # sale price
     rent_per_month = models.DecimalField(max_digits=10, decimal_places=2)
 
     # ── Current holder ────────────────────────────────
-    customer       = models.ForeignKey(
+    customer = models.ForeignKey(
         Customer,
         on_delete=models.SET_NULL,
         null=True, blank=True,
-        related_name="current_laptops"
+        related_name="current_laptops",
     )
 
     # ── Lifecycle ─────────────────────────────────────
@@ -83,9 +97,9 @@ class Laptop(AuditModel):
 
     # ── NEVER DELETE philosophy ───────────────────────
     # Laptops are NEVER deleted. When a laptop leaves the business it gets one of:
-    #   SOLD → sold to a customer
+    #   SOLD              → sold to a customer
     #   RETURNED_TO_SUPPLIER → sent back to supplier
-    #   WRITTEN_OFF → damaged beyond repair / scrapped
+    #   WRITTEN_OFF       → damaged beyond repair / scrapped
     # The full history lives in LaptopHistory + StockMovement.
 
     class Meta:
@@ -102,16 +116,16 @@ class LaptopHistory(AuditModel):
     Never updated, only appended.
     """
     ACTION_CHOICES = (
-        ("ADDED",               "Added to Inventory"),
-        ("RENTED_OUT",          "Rented Out"),
-        ("RETURNED",            "Returned by Customer"),
-        ("SOLD",                "Sold"),
-        ("SENT_FOR_MAINTENANCE","Sent for Maintenance"),
-        ("MAINTENANCE_DONE",    "Maintenance Done"),
-        ("RETURNED_TO_SUPPLIER","Returned to Supplier"),
-        ("WRITTEN_OFF",         "Written Off"),
-        ("STATUS_CHANGED",      "Status Changed"),
-        ("SPECS_UPDATED",       "Specs Updated"),
+        ("ADDED",                "Added to Inventory"),
+        ("RENTED_OUT",           "Rented Out"),
+        ("RETURNED",             "Returned by Customer"),
+        ("SOLD",                 "Sold"),
+        ("SENT_FOR_MAINTENANCE", "Sent for Maintenance"),
+        ("MAINTENANCE_DONE",     "Maintenance Done"),
+        ("RETURNED_TO_SUPPLIER", "Returned to Supplier"),
+        ("WRITTEN_OFF",          "Written Off"),
+        ("STATUS_CHANGED",       "Status Changed"),
+        ("SPECS_UPDATED",        "Specs Updated"),
     )
 
     laptop       = models.ForeignKey(Laptop, on_delete=models.CASCADE, related_name="history")
@@ -141,10 +155,10 @@ class StockMovement(AuditModel):
         ("WRITTEN_OFF",      "Written Off"),
     )
 
-    laptop         = models.ForeignKey(Laptop, on_delete=models.CASCADE, related_name="movements")
-    movement_type  = models.CharField(max_length=20, choices=MOVEMENT_TYPE)
-    quantity       = models.PositiveIntegerField(default=1)
-    remarks        = models.TextField(blank=True)
+    laptop        = models.ForeignKey(Laptop, on_delete=models.CASCADE, related_name="movements")
+    movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPE)
+    quantity      = models.PositiveIntegerField(default=1)
+    remarks       = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-created_at"]

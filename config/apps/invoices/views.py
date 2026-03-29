@@ -13,6 +13,9 @@ import io
 from .models import Invoice
 from .serializers import InvoiceSerializer
 
+from apps.audit.middleware import AuditModelMixin
+from apps.audit.models import AuditLog
+
 # --- Safe PDF backend detection (works on Windows without GTK) ---
 PDF_BACKEND = None
 
@@ -41,7 +44,8 @@ def render_pdf(html_string):
     return None
 
 
-class InvoiceViewSet(viewsets.ModelViewSet):
+class InvoiceViewSet(AuditModelMixin,viewsets.ModelViewSet):
+    audit_module = AuditLog.MODULE_INVOICES
     queryset = Invoice.objects.select_related("customer").prefetch_related("items__laptop").all()
     serializer_class = InvoiceSerializer
 

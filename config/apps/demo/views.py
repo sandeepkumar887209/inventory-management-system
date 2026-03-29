@@ -10,8 +10,11 @@ from apps.inventory.models import Laptop, StockMovement
 from .models import Demo, DemoItem
 from .serializers import DemoSerializer
 
+from apps.audit.middleware import AuditModelMixin
+from apps.audit.models import AuditLog
 
-class DemoViewSet(ModelViewSet):
+class DemoViewSet(AuditModelMixin,ModelViewSet):
+    audit_module = AuditLog.MODULE_DEMO
     queryset         = Demo.objects.all().order_by("-created_at")
     serializer_class = DemoSerializer
     filter_backends  = [filters.SearchFilter, filters.OrderingFilter]

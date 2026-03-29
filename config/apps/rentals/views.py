@@ -9,8 +9,12 @@ from .models import Rental, RentalItem
 from .serializers import RentalSerializer
 from apps.inventory.models import Laptop, StockMovement
 
+from apps.audit.middleware import AuditModelMixin
+from apps.audit.models import AuditLog
 
-class RentalViewSet(ModelViewSet):
+
+class RentalViewSet(AuditModelMixin,ModelViewSet):
+    audit_module = AuditLog.MODULE_RENTALS
     queryset = Rental.objects.all().order_by("-created_at")
     serializer_class = RentalSerializer
 

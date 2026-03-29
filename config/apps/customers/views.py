@@ -18,9 +18,11 @@ from .serializers import (
     CustomerWriteSerializer,
     CustomerMinimalSerializer,
 )
+from apps.audit.middleware import AuditModelMixin
+from apps.audit.models import AuditLog
 
-
-class CustomerViewSet(AuditModelViewSet):
+class CustomerViewSet(AuditModelMixin,AuditModelViewSet):
+    audit_module = AuditLog.MODULE_CUSTOMERS
 
     queryset = Customer.objects.all().order_by("-created_at")
     permission_classes = [IsStaffOrAdmin]

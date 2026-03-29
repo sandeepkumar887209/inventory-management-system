@@ -29,17 +29,10 @@ class CreatedBySerializer(serializers.Serializer):
 
 
 class LaptopHistorySerializer(serializers.ModelSerializer):
-    # Nested customer object (not just FK id)
     customer_detail = CustomerBriefSerializer(source="customer", read_only=True)
-
-    # Who performed the action
-    performed_by = serializers.SerializerMethodField()
-
-    # Human-readable action label
-    action_label = serializers.SerializerMethodField()
-
-    # Formatted datetime
-    date = serializers.SerializerMethodField()
+    performed_by    = serializers.SerializerMethodField()
+    action_label    = serializers.SerializerMethodField()
+    date            = serializers.SerializerMethodField()
 
     class Meta:
         model  = LaptopHistory
@@ -49,8 +42,8 @@ class LaptopHistorySerializer(serializers.ModelSerializer):
             "action_label",
             "from_status",
             "to_status",
-            "customer",          # raw FK (kept for backwards compat)
-            "customer_detail",   # ← full nested object
+            "customer",
+            "customer_detail",
             "remarks",
             "reference_id",
             "performed_by",
@@ -175,9 +168,10 @@ class LaptopListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "asset_tag", "brand", "model", "serial_number",
             "processor", "generation", "ram", "storage",
+            "gpu",                          # ← GPU field
             "display_size", "os", "color",
             "condition", "status",
-            "price", "rent_per_month","cost_to_company", "purchase_price", "purchase_date",
+            "price", "rent_per_month", "cost_to_company", "purchase_price", "purchase_date",
             "warranty_expiry", "purchased_from", "supplier_name",
             "customer_detail",
             "created_at",

@@ -5,6 +5,8 @@ from rest_framework.response import Response
 
 from apps.common.viewsets import AuditModelViewSet
 from apps.common.permissions import IsStaffOrAdmin
+from apps.audit.middleware import AuditModelMixin
+from apps.audit.models import AuditLog
 
 from .models import Laptop, LaptopHistory, StockMovement, Supplier
 from .serializers import (
@@ -24,7 +26,8 @@ class SupplierViewSet(AuditModelViewSet):
     search_fields      = ["name", "phone", "email"]
 
 
-class LaptopViewSet(AuditModelViewSet):
+class LaptopViewSet(AuditModelMixin, AuditModelViewSet):
+    audit_module = AuditLog.MODULE_INVENTORY
     queryset           = Laptop.objects.all().order_by("-created_at")
     serializer_class   = LaptopSerializer
     permission_classes = [IsStaffOrAdmin]

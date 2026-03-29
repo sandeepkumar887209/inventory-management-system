@@ -8,8 +8,12 @@ from .models import Sale, SaleItem
 from .serializers import SaleSerializer
 from apps.inventory.models import Laptop, StockMovement
 
+from apps.audit.middleware import AuditModelMixin
+from apps.audit.models import AuditLog
 
-class SaleViewSet(ModelViewSet):
+
+class SaleViewSet(AuditModelMixin,ModelViewSet):
+    audit_module = AuditLog.MODULE_SALES
     queryset = Sale.objects.all().order_by("-created_at")
     serializer_class = SaleSerializer
 
