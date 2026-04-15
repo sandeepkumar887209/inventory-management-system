@@ -21,13 +21,23 @@ import {
   ChevronDown,
   Check,
   Zap,
+  TestTube2,
 } from "lucide-react";
 
 type Module = "erp" | "crm" | "accounts";
 
-const MODULES = [
+const MODULES: {
+  key: Module;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+  accent: string;
+  accentBg: string;
+  accentBorder: string;
+  defaultPath: string;
+}[] = [
   {
-    key: "erp" as Module,
+    key: "erp",
     label: "ERP",
     description: "Operations & Sales",
     icon: Briefcase,
@@ -37,7 +47,7 @@ const MODULES = [
     defaultPath: "/",
   },
   {
-    key: "crm" as Module,
+    key: "crm",
     label: "CRM",
     description: "Leads & Pipeline",
     icon: Users2,
@@ -47,7 +57,7 @@ const MODULES = [
     defaultPath: "/crm/leads",
   },
   {
-    key: "accounts" as Module,
+    key: "accounts",
     label: "Accounts",
     description: "Billing & Finance",
     icon: BookOpen,
@@ -63,27 +73,28 @@ const MENUS: Record<
   { label: string; icon: React.ElementType; path: string; badge?: string }[]
 > = {
   erp: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-    { label: "Inventory", icon: Laptop, path: "/inventory" },
-    { label: "Rentals", icon: Calendar, path: "/rentals" },
-    { label: "Sales", icon: ShoppingCart, path: "/sales" },
-    { label: "Customers", icon: Users, path: "/customers" },
-    { label: "Suppliers", icon: Building2, path: "/inventory/suppliers" },
-    { label: "Reports", icon: BarChart3, path: "/reports" },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/"                    },
+    { label: "Inventory", icon: Laptop,          path: "/inventory"            },
+    { label: "Rentals",   icon: Calendar,         path: "/rentals"              },
+    { label: "Demos",     icon: TestTube2,        path: "/demos"                },
+    { label: "Sales",     icon: ShoppingCart,     path: "/sales"                },
+    { label: "Customers", icon: Users,            path: "/customers"            },
+    { label: "Suppliers", icon: Building2,        path: "/inventory/suppliers"  },
+    { label: "Reports",   icon: BarChart3,         path: "/reports"              },
   ],
   crm: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/crm" },
-    { label: "Leads", icon: Users2, path: "/crm/leads" },
-    { label: "Pipeline", icon: TrendingUp, path: "/crm/pipeline" },
-    { label: "Activities", icon: Activity, path: "/crm/activities" },
-    { label: "Follow-ups", icon: Bell, path: "/crm/followups", badge: "3" },
+    { label: "Dashboard",  icon: LayoutDashboard, path: "/crm"                  },
+    { label: "Leads",      icon: Users2,           path: "/crm/leads"            },
+    { label: "Pipeline",   icon: TrendingUp,       path: "/crm/pipeline"         },
+    { label: "Activities", icon: Activity,         path: "/crm/activities"       },
+    { label: "Follow-ups", icon: Bell,             path: "/crm/followups", badge: "3" },
   ],
   accounts: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/accounts" },
-    { label: "Invoices", icon: FileText, path: "/accounts/invoices" },
-    { label: "Payments", icon: Receipt, path: "/accounts/payments" },
-    { label: "Ledger", icon: BookOpen, path: "/accounts/ledger" },
-    { label: "Reports", icon: BarChart3, path: "/accounts/reports" },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/accounts"             },
+    { label: "Invoices",  icon: FileText,         path: "/accounts/invoices"    },
+    { label: "Payments",  icon: Receipt,          path: "/accounts/payments"    },
+    { label: "Ledger",    icon: BookOpen,         path: "/accounts/ledger"      },
+    { label: "Reports",   icon: BarChart3,         path: "/accounts/reports"     },
   ],
 };
 
@@ -99,12 +110,18 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Auto-switch module based on current path
   useEffect(() => {
-    if (location.pathname.startsWith("/crm")) setActiveModule("crm");
-    else if (location.pathname.startsWith("/accounts")) setActiveModule("accounts");
-    else setActiveModule("erp");
+    if (location.pathname.startsWith("/crm")) {
+      setActiveModule("crm");
+    } else if (location.pathname.startsWith("/accounts")) {
+      setActiveModule("accounts");
+    } else {
+      setActiveModule("erp");
+    }
   }, [location.pathname]);
 
+  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -120,8 +137,9 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const menuItems = MENUS[activeModule];
 
   const isActive = (path: string) => {
-    if (path === "/" || path === "/crm" || path === "/accounts")
+    if (path === "/" || path === "/crm" || path === "/accounts") {
       return location.pathname === path;
+    }
     return location.pathname.startsWith(path);
   };
 
@@ -147,13 +165,11 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         borderRight: "1px solid #e5e7eb",
       }}
     >
-      {/* Top accent stripe */}
+      {/* Accent stripe */}
       <div
         style={{
           position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
+          top: 0, left: 0, right: 0,
           height: "3px",
           background: `linear-gradient(90deg, ${mod.accent}, ${mod.accent}55)`,
           transition: "background 0.3s ease",
@@ -175,49 +191,26 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       >
         <div
           style={{
-            width: "34px",
-            height: "34px",
-            borderRadius: "10px",
-            background: mod.accent,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            transition: "background 0.3s",
+            width: "34px", height: "34px", borderRadius: "10px",
+            background: mod.accent, display: "flex", alignItems: "center",
+            justifyContent: "center", flexShrink: 0, transition: "background 0.3s",
           }}
         >
           <Laptop size={17} color="#fff" strokeWidth={2.2} />
         </div>
         {!collapsed && (
           <div style={{ overflow: "hidden" }}>
-            <div
-              style={{
-                fontWeight: 700,
-                fontSize: "15px",
-                color: "#111827",
-                letterSpacing: "-0.3px",
-                whiteSpace: "nowrap",
-                lineHeight: 1.2,
-              }}
-            >
+            <div style={{ fontWeight: 700, fontSize: "15px", color: "#111827", letterSpacing: "-0.3px", whiteSpace: "nowrap", lineHeight: 1.2 }}>
               Mr. Laptop
             </div>
-            <div
-              style={{
-                fontSize: "10px",
-                color: "#9ca3af",
-                fontWeight: 500,
-                letterSpacing: "0.3px",
-                textTransform: "uppercase",
-              }}
-            >
+            <div style={{ fontSize: "10px", color: "#9ca3af", fontWeight: 500, letterSpacing: "0.3px", textTransform: "uppercase" }}>
               Management Suite
             </div>
           </div>
         )}
       </div>
 
-      {/* Module Switcher */}
+      {/* Module switcher */}
       <div
         ref={dropdownRef}
         style={{
@@ -245,15 +238,9 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         >
           <div
             style={{
-              width: "28px",
-              height: "28px",
-              borderRadius: "7px",
-              background: mod.accent,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              transition: "background 0.3s",
+              width: "28px", height: "28px", borderRadius: "7px",
+              background: mod.accent, display: "flex", alignItems: "center",
+              justifyContent: "center", flexShrink: 0, transition: "background 0.3s",
             }}
           >
             <ModIcon size={14} color="#fff" />
@@ -279,7 +266,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           )}
         </button>
 
-        {/* Dropdown */}
+        {/* Module dropdown */}
         {dropdownOpen && !collapsed && (
           <div
             style={{
@@ -323,14 +310,9 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                 >
                   <div
                     style={{
-                      width: "28px",
-                      height: "28px",
-                      borderRadius: "7px",
+                      width: "28px", height: "28px", borderRadius: "7px",
                       background: active ? m.accent : "#f3f4f6",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                     }}
                   >
                     <Icon size={13} color={active ? "#fff" : "#6b7280"} />
@@ -351,29 +333,13 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
       {/* Section label */}
       {!collapsed && (
-        <div
-          style={{
-            padding: "14px 16px 4px",
-            fontSize: "10px",
-            fontWeight: 600,
-            color: "#9ca3af",
-            letterSpacing: "0.7px",
-            textTransform: "uppercase",
-          }}
-        >
+        <div style={{ padding: "14px 16px 4px", fontSize: "10px", fontWeight: 600, color: "#9ca3af", letterSpacing: "0.7px", textTransform: "uppercase" }}>
           Menu
         </div>
       )}
 
-      {/* Nav */}
-      <nav
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          overflowX: "hidden",
-          padding: collapsed ? "8px" : "4px 10px",
-        }}
-      >
+      {/* Nav items */}
+      <nav style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: collapsed ? "8px" : "4px 10px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -404,6 +370,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   if (!active) (e.currentTarget as HTMLElement).style.background = "transparent";
                 }}
               >
+                {/* Active indicator bar */}
                 {active && (
                   <div
                     style={{
@@ -419,16 +386,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   />
                 )}
 
-                <div
-                  style={{
-                    width: "20px",
-                    height: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
+                <div style={{ width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <Icon
                     size={16}
                     color={active ? mod.accent : "#6b7280"}
@@ -455,14 +413,9 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                     {item.badge && (
                       <span
                         style={{
-                          fontSize: "10px",
-                          fontWeight: 700,
-                          color: "#fff",
-                          background: "#ef4444",
-                          borderRadius: "99px",
-                          padding: "1px 6px",
-                          lineHeight: "16px",
-                          flexShrink: 0,
+                          fontSize: "10px", fontWeight: 700, color: "#fff",
+                          background: "#ef4444", borderRadius: "99px",
+                          padding: "1px 6px", lineHeight: "16px", flexShrink: 0,
                         }}
                       >
                         {item.badge}
@@ -471,17 +424,13 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   </>
                 )}
 
+                {/* Collapsed badge dot */}
                 {collapsed && item.badge && (
                   <div
                     style={{
-                      position: "absolute",
-                      top: "7px",
-                      right: "7px",
-                      width: "7px",
-                      height: "7px",
-                      borderRadius: "50%",
-                      background: "#ef4444",
-                      border: "1.5px solid #fff",
+                      position: "absolute", top: "7px", right: "7px",
+                      width: "7px", height: "7px", borderRadius: "50%",
+                      background: "#ef4444", border: "1.5px solid #fff",
                     }}
                   />
                 )}
@@ -499,25 +448,13 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         {!collapsed && (
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "7px",
-              padding: "7px 10px",
-              borderRadius: "8px",
-              background: "#f9fafb",
-              border: "1px solid #f3f4f6",
+              display: "flex", alignItems: "center", gap: "7px",
+              padding: "7px 10px", borderRadius: "8px",
+              background: "#f9fafb", border: "1px solid #f3f4f6",
               marginBottom: "8px",
             }}
           >
-            <div
-              style={{
-                width: "7px",
-                height: "7px",
-                borderRadius: "50%",
-                background: "#10b981",
-                flexShrink: 0,
-              }}
-            />
+            <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#10b981", flexShrink: 0 }} />
             <span style={{ fontSize: "11px", color: "#6b7280", flex: 1 }}>System Online</span>
             <Zap size={11} color="#d1d5db" />
           </div>
@@ -546,11 +483,10 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
               Collapse sidebar
             </span>
           )}
-          {collapsed ? (
-            <ChevronRight size={14} color="#9ca3af" />
-          ) : (
-            <ChevronLeft size={14} color="#9ca3af" />
-          )}
+          {collapsed
+            ? <ChevronRight size={14} color="#9ca3af" />
+            : <ChevronLeft  size={14} color="#9ca3af" />
+          }
         </button>
       </div>
     </aside>

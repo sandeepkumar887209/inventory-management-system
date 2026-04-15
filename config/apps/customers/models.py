@@ -104,3 +104,62 @@ class Customer(AuditModel):
     def full_address(self):
         parts = [p for p in [self.address, self.city, self.state, self.pincode] if p]
         return ', '.join(parts)
+
+
+class CustomerHistory(AuditModel):
+    """
+    Immutable audit trail for every significant event on a customer.
+    Never updated — only appended (like LaptopHistory).
+    Written automatically via signals whenever Rental / Demo / Sale changes.
+    """
+
+    ACTION_CHOICES = (
+        # Account lifecycle
+        ("CUSTOMER_CREATED",  "Customer Created"),
+        ("PROFILE_UPDATED",   "Profile Updated"),
+        ("DEACTIVATED",       "Customer Deactivated"),
+        ("REACTIVATED",       "Customer Reactivated"),
+        # Rental events
+        ("RENTAL_OUT",        "Laptop Rented Out"),
+        ("RENTAL_RETURNED",   "Rental Returned"),
+        ("RENTAL_REPLACED",   "Rental Replaced"),
+        # Demo events
+        ("DEMO_OUT",          "Demo Assigned"),
+        ("DEMO_RETURNED",     "Demo Returned"),
+        ("DEMO_CONVERTED",    "Demo Converted"),
+        # Sale events
+        ("SALE",              "Laptop Sold"),
+        ("SALE_RETURNED",     "Sale Returned"),
+    )
+
+    customer    = models.ForeignKey(
+        Customer,
+        on_delete=models.CASCADE,
+        related_name="history",
+    )
+    action      = models.CharField(max_length=30, choices=ACTION_CHOICES, db_index=True)
+
+    # Snapshot of the laptop involved (if any) — preserved even if records change
+    laptop_name = models.CharField(max_length=200, blank=True)
+    serial      = models.CharField(max_length=100, blank=True)
+
+    # Reference to the originating transaction
+    ref_id      = models.PositiveIntegerField(null=True, blank=True)
+    ref_label   = models.CharField(max_length=50, blank=True, help_text="e.g. R-12, D-5, S-8")
+
+    # Financial
+    amount      = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    # Human-readable summary
+    note        = models.TextField(blank=True)
+
+    # Actual business date (e.g. rental date, not row creation date)
+    event_date  = models.DateField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        ordering = ["-event_date", "-created_at"]
+        verbose_name        = "Customer History"
+        verbose_name_plural = "Customer Histories"
+
+    def __str__(self):
+        return f"{self.customer.name} — {self.action} ({self.event_date})"

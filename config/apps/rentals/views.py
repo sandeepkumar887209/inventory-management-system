@@ -1,22 +1,35 @@
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db import transaction
 
 from .models import Rental, RentalItem
-from .serializers import RentalSerializer
+from .serializers import RentalSerializer, RentalItemSerializer
 from apps.inventory.models import Laptop, StockMovement
 
 from apps.audit.middleware import AuditModelMixin
 from apps.audit.models import AuditLog
 
 
-class RentalViewSet(AuditModelMixin,ModelViewSet):
+class RentalViewSet(AuditModelMixin, ModelViewSet):
     audit_module = AuditLog.MODULE_RENTALS
-    queryset = Rental.objects.all().order_by("-created_at")
+    queryset = (
+        Rental.objects
+        .select_related("customer", "parent_rental")
+        .prefetch_related("items__laptop")
+        .order_by("-created_at")
+    )
     serializer_class = RentalSerializer
+
+    # ── Filtering & search ─────────────────────────────────────────────
+    filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["status", "customer"]
+    search_fields    = ["customer__name", "items__snapshot_customer_name"]
+    ordering_fields  = ["created_at", "rent_date", "total_amount"]
 
 
     # =========================================================
@@ -186,3 +199,32 @@ class RentalViewSet(AuditModelMixin,ModelViewSet):
             "success": True,
             "new_rental_id": new_rental.id
         })
+
+
+# =========================================================
+# 📋 RENTAL ITEM — direct ledger endpoint
+#    GET /rentals/rental-items/?customer=<id>
+#    Returns every RentalItem for a given customer using the
+#    denormalised snapshot_customer_name + rental__customer FK.
+# =========================================================
+class RentalItemViewSet(ReadOnlyModelViewSet):
+    serializer_class = RentalItemSerializer
+
+    filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields    = ["snapshot_customer_name", "snapshot_serial_number", "snapshot_brand", "snapshot_model"]
+    ordering_fields  = ["id", "rental__rent_date", "rent_price"]
+    ordering         = ["-id"]
+
+    def get_queryset(self):
+        qs = (
+            RentalItem.objects
+            .select_related("rental", "rental__customer", "laptop")
+            .order_by("-rental__rent_date", "-id")
+        )
+        customer_id = self.request.query_params.get("customer")
+        if customer_id:
+            qs = qs.filter(rental__customer_id=customer_id)
+        laptop_id = self.request.query_params.get("laptop")
+        if laptop_id:
+            qs = qs.filter(laptop_id=laptop_id)
+        return qs

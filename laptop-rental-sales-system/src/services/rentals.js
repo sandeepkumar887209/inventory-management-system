@@ -13,6 +13,10 @@ export const createRental = (data) =>
 export const updateRental = (id, data) =>
   api.patch(`/rentals/rental/${id}/`, data);
 
+/* ── RENTAL ITEMS (ledger) ── */
+export const getRentalItems = (params = {}) =>
+  api.get("/rentals/rental-items/", { params });
+
 /* ── RETURNS & REPLACEMENTS ── */
 export const returnLaptops = (rentalId, laptopIds) =>
   api.post(`/rentals/rental/${rentalId}/return_laptops/`, {

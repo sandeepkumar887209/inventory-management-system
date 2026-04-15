@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell, User, LogOut, Settings, ChevronDown,
-  UserCog, Search, Zap, Clock, Package, CheckCheck, X
+  UserCog, Search, Zap, Clock, Package, CheckCheck, X, Activity
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -71,7 +71,11 @@ export function Header({ sidebarCollapsed, userName, userRole = 'User', onLogout
     setNotifs(prev => prev.filter(n => n.id !== id));
   };
 
-  const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  // Extract real username from localStorage (stored during Login)
+  const displayUserName = localStorage.getItem("username") || userName;
+  const displayRole = displayUserName === "admin" ? "Administrator" : "User";
+
+  const initials = displayUserName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'AD';
 
   return (
     <>
@@ -540,8 +544,8 @@ export function Header({ sidebarCollapsed, userName, userRole = 'User', onLogout
             >
               <div className="lrs-avatar">{initials}</div>
               <div className="lrs-user-info">
-                <div className="lrs-user-name">{userName}</div>
-                <div className="lrs-user-role">{userRole}</div>
+                <div className="lrs-user-name">{displayUserName}</div>
+                <div className="lrs-user-role">{displayRole}</div>
               </div>
               <ChevronDown
                 size={14}
@@ -555,8 +559,8 @@ export function Header({ sidebarCollapsed, userName, userRole = 'User', onLogout
                 <div className="lrs-user-panel-header">
                   <div className="lrs-avatar-lg">{initials}</div>
                   <div>
-                    <div className="lrs-panel-name">{userName}</div>
-                    <div className="lrs-panel-role">{userRole}</div>
+                    <div className="lrs-panel-name">{displayUserName}</div>
+                    <div className="lrs-panel-role">{displayRole}</div>
                   </div>
                 </div>
 
@@ -570,6 +574,9 @@ export function Header({ sidebarCollapsed, userName, userRole = 'User', onLogout
                 </button>
                 <button className="lrs-menu-item" onClick={() => { navigate('/settings'); setShowUserMenu(false); }}>
                   <Settings size={14} /> Settings
+                </button>
+                <button className="lrs-menu-item" onClick={() => { navigate('/activity-logs'); setShowUserMenu(false); }}>
+                  <Activity size={14} /> Activity Logs
                 </button>
 
                 <div className="lrs-menu-sep" />

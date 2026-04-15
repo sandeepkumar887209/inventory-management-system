@@ -1,232 +1,220 @@
-import { Routes, Route, Outlet, useNavigate } from "react-router-dom";
-import { useState } from "react";
-import api from "./services/axios";
+import React, { useState } from "react";
+import {
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+} from "react-router-dom";
 
-/* Layout */
-import { Sidebar } from "./components/layout/Sidebar";
-import { Header }  from "./components/layout/Header";
-import { Modal }   from "./components/common/Modal";
+import { Sidebar }         from "./components/layout/Sidebar";
+import { Header }          from "./components/layout/Header";
+import RequireAuth         from "./components/auth/RequireAuth";
+import Login               from "./components/auth/Login";
+import { Signup }          from "./components/auth/Signup";
+import { ForgotPassword }  from "./components/auth/ForgotPassword";
 
-/* Auth */
-import Login       from "./components/auth/Login";
-import RequireAuth from "./components/auth/RequireAuth";
+import { DashboardModule }  from "./components/dashboard/DashboardModule";
+import { InventoryModule }  from "./components/inventory/InventoryModule";
+import { RentalModule }     from "./components/rentals/RentalModule";
+import { DemoModule }       from "./components/demo/DemoModule";
+import { SalesModule }      from "./components/sales/SalesModule";
+import { CustomerModule }   from "./components/customers/CustomerModule";
+import { CRMPage }          from "./components/crm/CRMPage";
+import { ReportsAnalytics } from "./components/reports/ReportsAnalytics";
+import { EnhancedSettings } from "./components/settings/EnhancedSettings";
+import { BillingDashboard } from "./components/billing/BillingDashboard";
+import { InvoiceList }      from "./components/invoices/InvoiceList";
+import { InvoiceView }      from "./components/invoices/InvoiceView";
+import { CreateInvoice }    from "./components/invoices/CreateInvoice";
+import { UserList }         from "./components/users/UserList";
+import { UserForm }         from "./components/users/UserForm";
+import { RoleManagement }   from "./components/users/RoleManagement";
 
-/* ── ERP ── */
-import { Dashboard }         from "./components/dashboard/Dashboard";
-import { InventoryList }     from "./components/inventory/InventoryList";
-import { LaptopForm }        from "./components/inventory/LaptopForm";
-import { LaptopDetail }      from "./components/inventory/LaptopDetail";
-import { SupplierPage }      from "./components/inventory/SupplierPage";
-import { RentalModule }      from "./components/rentals/RentalModule";
-import { CustomerList }      from "./components/customers/CustomerList";
-import { CustomerDetail }    from "./components/customers/CustomerDetail";
-import { CustomerForm }      from "./components/customers/CustomerForm";
-import { SalesList }         from "./components/sales/SalesList";
-import { SaleDetail }        from "./components/sales/SaleDetail";
-import { CreateSale }        from "./components/sales/CreateSale";
-import { ReportsAnalytics }  from "./components/reports/ReportsAnalytics";
-import { Settings }          from "./components/settings/Settings";
+import { ActivityLogs } from "./components/audit/ActivityLogs";
 
-/* ── CRM ── */
-import { CRMPage } from "./components/crm/CRMPage";
+/* ─── Layout ─── */
+function Layout({
+  sidebarCollapsed,
+  toggleSidebar,
+}: {
+  sidebarCollapsed: boolean;
+  toggleSidebar: () => void;
+}) {
+  const handleLogout = () => {
+    localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
+    window.location.href = "/login";
+  };
 
-/* ── Coming Soon placeholder ── */
-function ComingSoon({ title }: { title: string }) {
   return (
-    <div className="flex flex-col items-center justify-center h-96 text-center">
-      <div className="w-16 h-16 bg-neutral-100 rounded-xl flex items-center justify-center mb-4">
-        <span className="text-3xl">🚧</span>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f8f7f5" }}>
+      <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
+
+      <div
+        style={{
+          flex: 1,
+          marginLeft: sidebarCollapsed ? "72px" : "256px",
+          transition: "margin-left 0.25s",
+          display: "flex",
+          flexDirection: "column",
+          minHeight: "100vh",
+        }}
+      >
+        <Header
+          sidebarCollapsed={sidebarCollapsed}
+          userName="Admin User"
+          userRole="Administrator"
+          onLogout={handleLogout}
+        />
+
+        <main style={{ flex: 1, paddingTop: "58px" }}>
+          <Outlet />
+        </main>
       </div>
-      <h2 className="text-2xl font-bold text-neutral-900 mb-1">{title}</h2>
-      <p className="text-neutral-600">This module is coming soon.</p>
     </div>
   );
 }
 
-export default function App() {
-  const [sidebarCollapsed,   setSidebarCollapsed]   = useState(false);
-  const [modalOpen,          setModalOpen]          = useState(false);
-  const [modalType,          setModalType]          = useState<"laptop" | null>(null);
-  const [editingItem,        setEditingItem]        = useState<any>(null);
-  const [refreshKey,         setRefreshKey]         = useState(0);
-  const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
+/* ─── Invoices Page ─── */
+function InvoicesPage() {
+  const [view, setView] = useState<"list" | "create" | "view">("list");
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
-  const navigate = useNavigate();
+  if (view === "create") {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <CreateInvoice onSuccess={() => setView("list")} onCancel={() => setView("list")} />
+      </div>
+    );
+  }
 
-  const openModal = (type: "laptop", item?: any) => {
-    setModalType(type);
-    setEditingItem(item || null);
-    setModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setModalOpen(false);
-    setModalType(null);
-    setEditingItem(null);
-  };
-
-  const handleLaptopSubmit = async (data: any) => {
-    try {
-      if (editingItem?.id) {
-        await api.put(`/inventory/laptops/${editingItem.id}/`, data);
-      } else {
-        await api.post("/inventory/laptops/", data);
-      }
-      closeModal();
-      setRefreshKey((k) => k + 1);
-    } catch {
-      alert("Failed to save laptop");
-    }
-  };
-
-  return (
-    <>
-      <Routes>
-
-        {/* Public */}
-        <Route path="/login" element={<Login />} />
-
-        {/* Protected */}
-        <Route element={<RequireAuth />}>
-          <Route
-            element={
-              <Layout
-                sidebarCollapsed={sidebarCollapsed}
-                toggleSidebar={() => setSidebarCollapsed((c) => !c)}
-              />
-            }
-          >
-
-            {/* ══ ERP ══════════════════════════════ */}
-            <Route path="/" element={<Dashboard />} />
-
-            {/* Inventory */}
-            <Route
-              path="/inventory"
-              element={
-                <InventoryList
-                  refreshKey={refreshKey}
-                  onAddNew={() => openModal("laptop")}
-                  onEdit={(item) => openModal("laptop", item)}
-                  onView={(item) => navigate(`/inventory/${item.id}`)}
-                />
-              }
-            />
-            <Route path="/inventory/:id"       element={<LaptopDetail />} />
-            <Route path="/inventory/suppliers" element={<SupplierPage />} />
-
-            {/* ── Rentals — all handled by RentalModule ── */}
-            <Route path="/rentals/*" element={<RentalModule />} />
-
-            {/* Sales */}
-            <Route
-              path="/sales"
-              element={
-                <SalesList
-                  onCreateNew={() => navigate("/sales/new")}
-                  onViewInvoice={(sale) => navigate(`/sales/${sale.id}`)}
-                />
-              }
-            />
-            <Route path="/sales/new" element={<CreateSale />} />
-            <Route path="/sales/:id" element={<SaleDetail />} />
-
-            {/* Customers */}
-            <Route
-              path="/customers"
-              element={
-                <CustomerList
-                  key={customerRefreshKey}
-                  onAddNew={() => navigate("/customers/new")}
-                  onViewDetails={(c) => navigate(`/customers/${c.id}`)}
-                />
-              }
-            />
-            <Route
-              path="/customers/new"
-              element={
-                <CustomerForm
-                  onSuccess={() => {
-                    setCustomerRefreshKey((k) => k + 1);
-                    navigate("/customers");
-                  }}
-                />
-              }
-            />
-            <Route path="/customers/:id" element={<CustomerDetail />} />
-
-            {/* ERP extras */}
-            <Route path="/stock"    element={<ComingSoon title="Stock Management" />} />
-            <Route path="/invoices" element={<ComingSoon title="Invoices" />} />
-            <Route path="/reports"  element={<ReportsAnalytics />} />
-
-            {/* ══ CRM ══════════════════════════════ */}
-            <Route path="/crm/*" element={<CRMPage />} />
-
-            {/* ══ ACCOUNTS ═════════════════════════ */}
-            <Route path="/accounts"          element={<ComingSoon title="Accounts Dashboard" />} />
-            <Route path="/accounts/invoices" element={<ComingSoon title="Billing Invoices" />} />
-            <Route path="/accounts/payments" element={<ComingSoon title="Payment Tracking" />} />
-            <Route path="/accounts/ledger"   element={<ComingSoon title="Customer Ledger" />} />
-            <Route path="/accounts/reports"  element={<ComingSoon title="Financial Reports" />} />
-
-            {/* ══ ADMIN ════════════════════════════ */}
-            <Route path="/users"    element={<ComingSoon title="Users & Roles" />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/profile"  element={<ComingSoon title="My Profile" />} />
-
-          </Route>
-        </Route>
-
-      </Routes>
-
-      {/* MODAL — laptop only (rentals now live inside RentalModule) */}
-      <Modal
-        isOpen={modalOpen}
-        onClose={closeModal}
-        title={editingItem ? "Edit Laptop" : "Add Laptop"}
-      >
-        {modalType === "laptop" && (
-          <LaptopForm
-            laptop={editingItem}
-            onSubmit={handleLaptopSubmit}
-            onCancel={closeModal}
-          />
-        )}
-      </Modal>
-    </>
-  );
-}
-
-function Layout({ sidebarCollapsed, toggleSidebar }: any) {
-  return (
-    <div className="min-h-screen bg-neutral-50">
-
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={toggleSidebar}
-      />
-
-      <Header
-        sidebarCollapsed={sidebarCollapsed}
-        userName="Admin"
-        userRole="Administrator"
-        onLogout={() => {
-          localStorage.removeItem("access");
-          window.location.href = "/login";
+  if (view === "view" && selectedInvoice) {
+    return (
+      <InvoiceView
+        invoice={selectedInvoice}
+        onClose={() => {
+          setView("list");
+          setSelectedInvoice(null);
         }}
       />
+    );
+  }
 
-      <main
-        className={`pt-16 transition-all ${
-          sidebarCollapsed ? "ml-20" : "ml-64"
-        }`}
-      >
-        <div className="p-6">
-          <Outlet />
-        </div>
-      </main>
-
+  return (
+    <div className="p-6">
+      <InvoiceList
+        onCreateNew={() => setView("create")}
+        onViewInvoice={(invoice: any) => {
+          setSelectedInvoice(invoice);
+          setView("view");
+        }}
+      />
     </div>
+  );
+}
+
+/* ─── Users Page ─── */
+function UsersPage() {
+  const [view, setView] = useState<"list" | "form" | "permissions">("list");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+
+  if (view === "form") {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <UserForm
+          user={selectedUser}
+          onSubmit={() => setView("list")}
+          onCancel={() => setView("list")}
+        />
+      </div>
+    );
+  }
+
+  if (view === "permissions" && selectedUser) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <RoleManagement
+          user={selectedUser}
+          onSave={() => setView("list")}
+          onCancel={() => setView("list")}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <UserList
+        onAddNew={() => {
+          setSelectedUser(null);
+          setView("form");
+        }}
+        onEdit={(user: any) => {
+          setSelectedUser(user);
+          setView("form");
+        }}
+        onManagePermissions={(user: any) => {
+          setSelectedUser(user);
+          setView("permissions");
+        }}
+      />
+    </div>
+  );
+}
+
+/* ─── App ─── */
+export default function App() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  return (
+    <Routes>
+
+      {/* Public */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup onSignup={() => {}} onSwitchToLogin={() => {}} />} />
+      <Route path="/forgot-password" element={<ForgotPassword onBack={() => {}} onResetRequest={() => {}} />} />
+
+      {/* Protected */}
+      <Route element={<RequireAuth />}>
+        <Route
+          element={
+            <Layout
+              sidebarCollapsed={sidebarCollapsed}
+              toggleSidebar={() => setSidebarCollapsed((c) => !c)}
+            />
+          }
+        >
+          {/* ✅ Dashboard Module */}
+          <Route path="/" element={<DashboardModule />} />
+
+          {/* Modules */}
+          <Route path="/inventory/*" element={<InventoryModule />} />
+          <Route path="/rentals/*" element={<RentalModule />} />
+          <Route path="/demos/*" element={<DemoModule />} />
+          <Route path="/sales/*" element={<SalesModule />} />
+          <Route path="/customers/*" element={<CustomerModule />} />
+
+          {/* CRM */}
+          <Route path="/crm/*" element={<div className="p-6"><CRMPage /></div>} />
+
+          {/* Accounts */}
+          <Route path="/accounts" element={<div className="p-6"><BillingDashboard /></div>} />
+          <Route path="/accounts/invoices" element={<InvoicesPage />} />
+          <Route path="/accounts/payments" element={<div className="p-6"><BillingDashboard /></div>} />
+          <Route path="/accounts/ledger" element={<div className="p-6"><h2>Ledger</h2></div>} />
+          <Route path="/accounts/reports" element={<div className="p-6"><ReportsAnalytics /></div>} />
+
+          {/* Others */}
+          <Route path="/reports" element={<div className="p-6"><ReportsAnalytics /></div>} />
+          <Route path="/users" element={<UsersPage />} />
+          <Route path="/settings" element={<div className="p-6"><EnhancedSettings /></div>} />
+          <Route path="/activity-logs" element={<ActivityLogs />} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Route>
+
+    </Routes>
   );
 }

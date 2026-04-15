@@ -8,10 +8,11 @@ from rest_framework.viewsets import ModelViewSet
 from apps.inventory.models import Laptop, StockMovement
 
 from .models import Demo, DemoItem
-from .serializers import DemoSerializer
-
 from apps.audit.middleware import AuditModelMixin
 from apps.audit.models import AuditLog
+from rest_framework.viewsets import ReadOnlyModelViewSet
+from django_filters.rest_framework import DjangoFilterBackend
+from .serializers import DemoSerializer, DemoItemSerializer
 
 class DemoViewSet(AuditModelMixin,ModelViewSet):
     audit_module = AuditLog.MODULE_DEMO
@@ -294,3 +295,29 @@ class DemoViewSet(AuditModelMixin,ModelViewSet):
             "overdue":          qs.filter(status="ONGOING", expected_return_date__lt=today).count(),
             "feedback_received":qs.filter(feedback_received=True).count(),
         })
+
+# =========================================================
+# 📋 DEMO ITEM — direct ledger endpoint
+#    GET /demos/demo-items/?customer=<id>
+# =========================================================
+class DemoItemViewSet(ReadOnlyModelViewSet):
+    serializer_class = DemoItemSerializer
+
+    filter_backends  = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    search_fields    = ["snapshot_customer_name", "snapshot_serial_number", "snapshot_brand", "snapshot_model"]
+    ordering_fields  = ["id", "demo__assigned_date"]
+    ordering         = ["-id"]
+
+    def get_queryset(self):
+        qs = (
+            DemoItem.objects
+            .select_related("demo", "demo__customer", "laptop")
+            .order_by("-demo__assigned_date", "-id")
+        )
+        customer_id = self.request.query_params.get("customer")
+        if customer_id:
+            qs = qs.filter(demo__customer_id=customer_id)
+        laptop_id = self.request.query_params.get("laptop")
+        if laptop_id:
+            qs = qs.filter(laptop_id=laptop_id)
+        return qs

@@ -296,7 +296,7 @@ export function Empty({ message = "Nothing here yet." }) {
 export const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
-export const daysDiff = (dateStr) => {
+export const daysUntil  = (dateStr) => {
   if (!dateStr) return null;
   const due   = new Date(dateStr);
   const today = new Date();
@@ -307,3 +307,13 @@ export const daysDiff = (dateStr) => {
 
 export const fmtINR = (n) =>
   n != null ? `₹${Number(n).toLocaleString("en-IN")}` : "—";
+
+export function daysDiff(start: string, end?: string) {
+  if (!start) return 0;
+
+  const s = new Date(start);
+  const e = end ? new Date(end) : new Date();
+
+  const diff = e.getTime() - s.getTime();
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}

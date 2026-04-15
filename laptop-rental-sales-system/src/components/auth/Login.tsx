@@ -40,6 +40,7 @@ export default function Login({
       // ✅ SAVE TOKENS (EXACT MATCH WITH BACKEND)
       localStorage.setItem("access", data.access);
       localStorage.setItem("refresh", data.refresh);
+      localStorage.setItem("username", username);
 
       // ✅ REACT ROUTER REDIRECT (NO PAGE RELOAD)
       navigate("/", { replace: true });

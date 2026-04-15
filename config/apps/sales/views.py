@@ -10,6 +10,10 @@ from apps.inventory.models import Laptop, StockMovement
 
 from apps.audit.middleware import AuditModelMixin
 from apps.audit.models import AuditLog
+from rest_framework.viewsets import ReadOnlyModelViewSet
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+from .serializers import SaleSerializer, SaleItemSerializer
 
 
 class SaleViewSet(AuditModelMixin,ModelViewSet):
@@ -178,3 +182,29 @@ class SaleViewSet(AuditModelMixin,ModelViewSet):
             },
             "sale_id": sale.id,
         })
+
+# =========================================================
+# 📋 SALE ITEM — direct ledger endpoint
+#    GET /sales/sale-items/?customer=<id>
+# =========================================================
+class SaleItemViewSet(ReadOnlyModelViewSet):
+    serializer_class = SaleItemSerializer
+
+    filter_backends  = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields    = ["snapshot_customer_name", "snapshot_serial_number", "snapshot_brand", "snapshot_model"]
+    ordering_fields  = ["id", "sale__sale_date", "sale_price"]
+    ordering         = ["-id"]
+
+    def get_queryset(self):
+        qs = (
+            SaleItem.objects
+            .select_related("sale", "sale__customer", "laptop")
+            .order_by("-sale__sale_date", "-id")
+        )
+        customer_id = self.request.query_params.get("customer")
+        if customer_id:
+            qs = qs.filter(sale__customer_id=customer_id)
+        laptop_id = self.request.query_params.get("laptop")
+        if laptop_id:
+            qs = qs.filter(laptop_id=laptop_id)
+        return qs

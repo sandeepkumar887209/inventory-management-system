@@ -1,3 +1,7 @@
+"""
+apps/demo/serializers.py — with laptop + customer snapshot support
+"""
+
 from rest_framework import serializers
 from .models import Demo, DemoItem
 from apps.inventory.models import Laptop, StockMovement
@@ -25,9 +29,61 @@ class DemoItemSerializer(serializers.ModelSerializer):
         write_only=True
     )
 
+    # Parent demo context — needed by the ledger
+    demo_id              = serializers.IntegerField(source="demo.id",               read_only=True)
+    demo_status          = serializers.CharField(source="demo.status",              read_only=True)
+    assigned_date        = serializers.DateField(source="demo.assigned_date",       read_only=True)
+    expected_return_date = serializers.DateField(source="demo.expected_return_date",read_only=True)
+    actual_return_date   = serializers.DateField(source="demo.actual_return_date",  read_only=True)
+
+    # Convenience read-only helpers built from the snapshot
+    display_name = serializers.ReadOnlyField()
+    serial       = serializers.ReadOnlyField()
+
     class Meta:
         model  = DemoItem
-        fields = ("id", "laptop", "laptop_id")
+        fields = [
+            "id",
+            # FK / live
+            "laptop", "laptop_id",
+            # parent demo context
+            "demo_id", "demo_status", "assigned_date", "expected_return_date", "actual_return_date",
+            # snapshot — identity
+            "snapshot_brand",
+            "snapshot_model",
+            "snapshot_serial_number",
+            "snapshot_asset_tag",
+            # snapshot — specs
+            "snapshot_processor",
+            "snapshot_generation",
+            "snapshot_ram",
+            "snapshot_storage",
+            "snapshot_gpu",
+            "snapshot_display",
+            "snapshot_os",
+            "snapshot_color",
+            "snapshot_condition",
+            # snapshot — pricing
+            "snapshot_list_price",
+            "snapshot_rent_per_month",
+            # snapshot — source
+            "snapshot_purchased_from",
+            # snapshot — customer
+            "snapshot_customer_name",
+            # computed helpers
+            "display_name",
+            "serial",
+        ]
+        read_only_fields = [
+            "demo_id", "demo_status", "assigned_date", "expected_return_date", "actual_return_date",
+            "snapshot_brand", "snapshot_model", "snapshot_serial_number",
+            "snapshot_asset_tag", "snapshot_processor", "snapshot_generation",
+            "snapshot_ram", "snapshot_storage", "snapshot_gpu", "snapshot_display",
+            "snapshot_os", "snapshot_color", "snapshot_condition",
+            "snapshot_list_price", "snapshot_rent_per_month", "snapshot_purchased_from",
+            "snapshot_customer_name",
+            "display_name", "serial",
+        ]
 
 
 class DemoSerializer(serializers.ModelSerializer):
@@ -84,6 +140,7 @@ class DemoSerializer(serializers.ModelSerializer):
                 remarks=f"Demo #{demo.id} — assigned for demo"
             )
 
+            # DemoItem.save() will auto-populate snapshot fields
             DemoItem.objects.create(demo=demo, laptop=laptop)
 
         return demo

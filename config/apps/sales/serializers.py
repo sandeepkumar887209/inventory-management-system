@@ -1,3 +1,7 @@
+"""
+apps/sales/serializers.py — with laptop + customer snapshot support
+"""
+
 from rest_framework import serializers
 from .models import Sale, SaleItem
 from apps.inventory.models import Laptop, StockMovement
@@ -19,7 +23,6 @@ class InventoryNestedSerializer(serializers.ModelSerializer):
 class SaleItemSerializer(serializers.ModelSerializer):
 
     laptop = InventoryNestedSerializer(read_only=True)
-
     laptop_id = serializers.PrimaryKeyRelatedField(
         queryset=Laptop.objects.filter(status="AVAILABLE"),
         source="laptop",
@@ -33,9 +36,60 @@ class SaleItemSerializer(serializers.ModelSerializer):
         required=False
     )
 
+    # Parent sale context — needed by the ledger
+    sale_id     = serializers.IntegerField(source="sale.id",        read_only=True)
+    sale_status = serializers.CharField(source="sale.status",       read_only=True)
+    sale_date   = serializers.DateField(source="sale.sale_date",    read_only=True)
+
+    # Convenience read-only helpers built from the snapshot
+    display_name = serializers.ReadOnlyField()
+    serial       = serializers.ReadOnlyField()
+
     class Meta:
         model = SaleItem
-        fields = ["id", "laptop", "laptop_id", "sale_price"]
+        fields = [
+            "id",
+            # FK / live
+            "laptop", "laptop_id",
+            # parent sale context
+            "sale_id", "sale_status", "sale_date",
+            # price
+            "sale_price",
+            # snapshot — identity
+            "snapshot_brand",
+            "snapshot_model",
+            "snapshot_serial_number",
+            "snapshot_asset_tag",
+            # snapshot — specs
+            "snapshot_processor",
+            "snapshot_generation",
+            "snapshot_ram",
+            "snapshot_storage",
+            "snapshot_gpu",
+            "snapshot_display",
+            "snapshot_os",
+            "snapshot_color",
+            "snapshot_condition",
+            # snapshot — pricing
+            "snapshot_list_price",
+            # snapshot — source
+            "snapshot_purchased_from",
+            # snapshot — customer
+            "snapshot_customer_name",
+            # computed helpers
+            "display_name",
+            "serial",
+        ]
+        read_only_fields = [
+            "sale_id", "sale_status", "sale_date",
+            "snapshot_brand", "snapshot_model", "snapshot_serial_number",
+            "snapshot_asset_tag", "snapshot_processor", "snapshot_generation",
+            "snapshot_ram", "snapshot_storage", "snapshot_gpu", "snapshot_display",
+            "snapshot_os", "snapshot_color", "snapshot_condition",
+            "snapshot_list_price", "snapshot_purchased_from",
+            "snapshot_customer_name",
+            "display_name", "serial",
+        ]
 
 
 class SaleSerializer(serializers.ModelSerializer):
@@ -99,7 +153,7 @@ class SaleSerializer(serializers.ModelSerializer):
                 remarks=f"Laptop sold via Sale #{sale.id}"
             )
 
-            # Create Sale Item
+            # Create Sale Item — save() will auto-populate snapshot fields
             SaleItem.objects.create(
                 sale=sale,
                 laptop=laptop,

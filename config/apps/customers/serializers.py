@@ -1,5 +1,30 @@
 from rest_framework import serializers
-from .models import Customer
+from .models import Customer, CustomerHistory
+
+
+# ─────────────────────────────────────────────
+#  Customer History (immutable audit trail)
+# ─────────────────────────────────────────────
+
+class CustomerHistorySerializer(serializers.ModelSerializer):
+    action_display = serializers.CharField(source="get_action_display", read_only=True)
+
+    class Meta:
+        model  = CustomerHistory
+        fields = (
+            "id",
+            "action",
+            "action_display",
+            "laptop_name",
+            "serial",
+            "ref_id",
+            "ref_label",
+            "amount",
+            "note",
+            "event_date",
+            "created_at",
+        )
+        read_only_fields = fields
 
 
 # ─────────────────────────────────────────────

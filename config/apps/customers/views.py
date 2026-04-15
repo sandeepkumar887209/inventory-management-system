@@ -17,6 +17,7 @@ from .serializers import (
     CustomerDetailSerializer,
     CustomerWriteSerializer,
     CustomerMinimalSerializer,
+    CustomerHistorySerializer,
 )
 from apps.audit.middleware import AuditModelMixin
 from apps.audit.models import AuditLog
@@ -221,3 +222,32 @@ class CustomerViewSet(AuditModelMixin,AuditModelViewSet):
         customer.is_active = True
         customer.save(update_fields=["is_active", "updated_at"])
         return Response({"detail": "Customer reactivated successfully."})
+
+    # ──────────────────────────────────────────────────────────────────────
+    #  /customers/{id}/history/
+    #  Reads from the persistent CustomerHistory table.
+    #  Optional filter: ?action=RENTAL_OUT,DEMO_OUT
+    # ──────────────────────────────────────────────────────────────────────
+
+    @action(detail=True, methods=["get"])
+    def history(self, request, pk=None):
+        from apps.customers.models import CustomerHistory
+
+        customer = self.get_object()
+
+        qs = CustomerHistory.objects.filter(customer=customer)
+
+        # Optional comma-separated action filter: ?action=RENTAL_OUT,DEMO_OUT
+        action_param = request.query_params.get("action", "").strip()
+        if action_param:
+            actions = [a.strip() for a in action_param.split(",") if a.strip()]
+            qs = qs.filter(action__in=actions)
+
+        qs = qs.order_by("-event_date", "-created_at")
+
+        serializer = CustomerHistorySerializer(qs, many=True)
+        return Response({
+            "customer_id": customer.id,
+            "count":       qs.count(),
+            "events":      serializer.data,
+        })
