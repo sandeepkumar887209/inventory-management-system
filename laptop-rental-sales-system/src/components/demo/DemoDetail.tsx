@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ChevronLeft, RotateCcw, TrendingUp, Check, ShoppingCart, MessageSquare } from "lucide-react";
 import { useParams } from "react-router-dom";
 import api from "../../services/axios";
-import { Card, CardHeader, Btn, Badge, Spinner, statusBadge, fmtDate, daysDiff, C, PURPOSE_LABELS } from "./ui";
+import { Card, CardHeader, Btn, Badge, Spinner, statusBadge, fmtDate, C, PURPOSE_LABELS } from "./ui";
 
 export function DemoDetail({ onBack }: { onBack: () => void }) {
   const { id }          = useParams();
@@ -60,9 +60,7 @@ export function DemoDetail({ onBack }: { onBack: () => void }) {
   if (loading) return <Spinner />;
   if (!demo)   return <div style={{ padding: "40px", color: "#bbb", textAlign: "center" }}>Demo not found.</div>;
 
-  const dueIn     = daysDiff(demo.expected_return_date);
   const isOngoing = demo.status === "ONGOING";
-  const isOverdue = isOngoing && dueIn !== null && dueIn < 0;
   const demoItems = demo.items_detail ?? [];
 
   return (
@@ -80,8 +78,7 @@ export function DemoDetail({ onBack }: { onBack: () => void }) {
         <div>
           <h1 style={{ fontSize: "22px", fontWeight: 600, color: "#1a1a1a", margin: 0 }}>Demo D-{demo.id}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "8px" }}>
-            {isOverdue ? <Badge color="red">Overdue by {Math.abs(dueIn!)}d</Badge> : statusBadge(demo.status)}
-            {isOngoing && !isOverdue && dueIn !== null && dueIn <= 3 && <Badge color="amber">Due in {dueIn}d</Badge>}
+            {statusBadge(demo.status)}
             {demo.feedback_received && <Badge color="teal">✓ Feedback received</Badge>}
           </div>
         </div>
@@ -208,7 +205,6 @@ export function DemoDetail({ onBack }: { onBack: () => void }) {
           <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px" }}>
             {[
               ["Assigned",      fmtDate(demo.assigned_date ?? demo.created_at)],
-              ["Return due",    fmtDate(demo.expected_return_date)],
               ["Duration",      demo.duration_days ? `${demo.duration_days} days` : "—"],
               ["Purpose",       PURPOSE_LABELS[demo.purpose] ?? demo.purpose ?? "—"],
               ["Training",      demo.requires_training ? "Yes" : "No"],

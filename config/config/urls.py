@@ -1,12 +1,17 @@
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView
+from apps.accounts.views import CustomTokenObtainPairView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    path('api/login/', TokenObtainPairView.as_view()),
+    # Auth — custom login that checks approval status
+    path('api/login/', CustomTokenObtainPairView.as_view()),
     path('api/refresh/', TokenRefreshView.as_view()),
+
+    # Accounts (register, user management)
+    path('api/accounts/', include('apps.accounts.urls')),
 
     path('api/inventory/', include('apps.inventory.urls')),
     path('api/customers/', include('apps.customers.urls')),
@@ -16,14 +21,20 @@ urlpatterns = [
     path('api/crm/', include('apps.crm.urls')),
     path('api/demos/', include('apps.demo.urls')),
     path('api/audit/', include('apps.audit.urls')),
-    # path("api/", include("apps.dashboard.urls")),
-
+    path('api/common/', include('apps.common.urls')),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 urlpatterns += [
-    path("api/pages/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/pages/login/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/pages/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 ]
+
 
 from django.apps import apps
 from django.contrib.admin.sites import AlreadyRegistered

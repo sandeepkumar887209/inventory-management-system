@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building, 
   DollarSign, 
@@ -16,21 +16,48 @@ import {
   Settings as SettingsIcon
 } from 'lucide-react';
 import { Button } from '../common/Button';
+import { useIdentity } from '../../context/IdentityContext';
+import { updateCompanySettingsApi } from '../../services/auth';
+import { Upload, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 export function EnhancedSettings() {
+  const { company, refreshIdentity } = useIdentity();
   const [activeTab, setActiveTab] = useState('company');
+  const [loading, setLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+
   const [formData, setFormData] = useState({
-    // Company
-    companyName: 'LaptopRent Solutions',
-    email: 'info@laptoprent.com',
-    phone: '+91 98765 43210',
-    address: '123 Business Park, Mumbai, Maharashtra 400001',
-    gstNumber: '27AAAAA0000A1Z5',
-    website: 'www.laptoprent.com',
+    // Branding
+    name: 'LaptopRent Solutions',
+    logo: '',
+    
+    // Business IDs
+    gstin: '',
+    pan_number: '',
+    
+    // Address
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    pincode: '',
+    country: 'India',
+
+    // Financial/Bank
+    bank_name: '',
+    account_number: '',
+    ifsc_code: '',
+
+    // Contact
+    email: '',
+    phone: '',
+    website: '',
+
+    // Legacy/UI Fields (kept for UI consistency)
     industry: 'Technology Rental',
     companySize: '50-100',
-    
-    // Pricing
     defaultLateFee: '100',
     securityDepositMultiple: '3',
     gstPercentage: '18',
@@ -38,8 +65,6 @@ export function EnhancedSettings() {
     currency: 'INR',
     paymentTerms: '30',
     earlyPaymentDiscount: '2',
-    
-    // Notifications
     emailNotifications: true,
     smsNotifications: false,
     rentalReminders: true,
@@ -48,40 +73,44 @@ export function EnhancedSettings() {
     leadNotifications: true,
     overdueAlerts: true,
     lowStockAlerts: true,
-    
-    // Security
     twoFactorAuth: false,
     sessionTimeout: '30',
     passwordExpiry: '90',
     ipWhitelisting: false,
     auditLogging: true,
-    
-    // Email Templates
     welcomeEmailEnabled: true,
     invoiceEmailEnabled: true,
     reminderEmailEnabled: true,
-    
-    // Integration
     googleCalendarSync: false,
     whatsappIntegration: false,
     slackNotifications: false,
-    
-    // Business Rules
     autoInvoiceGeneration: true,
     autoReminderSending: true,
     allowPartialPayments: true,
     requireSecurityDeposit: true,
-    
-    // Appearance
     theme: 'light',
     accentColor: '#3b82f6',
-    logo: '',
-    
-    // Backup & Data
     autoBackup: true,
     backupFrequency: 'daily',
     dataRetention: '365'
   });
+
+  useEffect(() => {
+    if (company) {
+      setFormData(prev => ({
+        ...prev,
+        ...company,
+        // Map backend names to local state if necessary
+      }));
+      if (company.logo) {
+        // Build full URL for preview
+        const fullLogoUrl = company.logo.startsWith('http') 
+          ? company.logo 
+          : `http://127.0.0.1:8000${company.logo}`;
+        setLogoPreview(fullLogoUrl);
+      }
+    }
+  }, [company]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -91,8 +120,47 @@ export function EnhancedSettings() {
     }));
   };
 
-  const handleSave = () => {
-    alert('Settings saved successfully!');
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaveStatus('saving');
+    try {
+      const data = new FormData();
+      // Only append fields that match the backend model
+      const backendFields = [
+        'name', 'gstin', 'pan_number', 'address_line1', 'address_line2', 
+        'city', 'state', 'pincode', 'country', 'phone', 'email', 'website',
+        'bank_name', 'account_number', 'ifsc_code'
+      ];
+      
+      backendFields.forEach(field => {
+        if (formData[field as keyof typeof formData] !== undefined) {
+          data.append(field, formData[field as keyof typeof formData] as string);
+        }
+      });
+
+      if (logoFile) {
+        data.append('logo', logoFile);
+      }
+
+      await updateCompanySettingsApi(data);
+      await refreshIdentity();
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (err) {
+      console.error("Save failed:", err);
+      setSaveStatus('error');
+    }
   };
 
   const tabs = [
@@ -133,12 +201,15 @@ export function EnhancedSettings() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-4 border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600'
+                      ? 'border-[#1a6ef5] text-[#1a6ef5]'
                       : 'border-transparent text-neutral-600 hover:text-neutral-900'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span className="font-medium text-sm">{tab.label}</span>
+                  {activeTab === tab.id && saveStatus === 'saving' && (
+                    <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                  )}
                 </button>
               );
             })}
@@ -146,119 +217,224 @@ export function EnhancedSettings() {
         </div>
 
         <div className="p-6">
-          {/* Company Profile */}
           {activeTab === 'company' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-neutral-900">Company Information</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Company Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="companyName"
-                    value={formData.companyName}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+            <div className="space-y-8">
+              {/* Branding Section */}
+              <section>
+                <h3 className="text-lg font-semibold text-neutral-900 mb-4">Branding</h3>
+                <div className="flex items-start gap-8">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-neutral-200 bg-neutral-50 flex items-center justify-center overflow-hidden relative group">
+                      {logoPreview ? (
+                        <img src={logoPreview} alt="Logo Preview" className="w-full h-full object-contain" />
+                      ) : (
+                        <Building className="w-8 h-8 text-neutral-300" />
+                      )}
+                      <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                        <Upload className="w-6 h-6 text-white" />
+                        <input type="file" className="hidden" accept="image/*" onChange={handleLogoChange} />
+                      </label>
+                    </div>
+                    <p className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider text-center">
+                      Logo (Square preferred)
+                    </p>
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                        Company Name *
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                        placeholder="Enter company legal name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1.5">
+                        Industry
+                      </label>
+                      <input
+                        type="text"
+                        name="industry"
+                        value={formData.industry}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
+              </section>
 
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Industry
-                  </label>
-                  <input
-                    type="text"
-                    name="industry"
-                    value={formData.industry}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+              {/* Business Identification */}
+              <section className="pt-6 border-t border-neutral-100">
+                <h3 className="text-lg font-semibold text-neutral-900 mb-4">Business Identification</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">GST Number</label>
+                    <input
+                      type="text"
+                      name="gstin"
+                      value={formData.gstin}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                      placeholder="e.g. 27AAAAA0000A1Z5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">PAN Number</label>
+                    <input
+                      type="text"
+                      name="pan_number"
+                      value={formData.pan_number}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                      placeholder="e.g. ABCDE1234F"
+                    />
+                  </div>
                 </div>
+              </section>
 
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Email Address *
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+              {/* Registered Address */}
+              <section className="pt-6 border-t border-neutral-100">
+                <h3 className="text-lg font-semibold text-neutral-900 mb-4">Registered Address</h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-neutral-700 mb-1.5">Address Line 1</label>
+                      <input
+                        type="text"
+                        name="address_line1"
+                        value={formData.address_line1}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1.5">City</label>
+                      <input
+                        type="text"
+                        name="city"
+                        value={formData.city}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1.5">State</label>
+                      <input
+                        type="text"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1.5">Pincode</label>
+                      <input
+                        type="text"
+                        name="pincode"
+                        value={formData.pincode}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 mb-1.5">Country</label>
+                      <input
+                        type="text"
+                        name="country"
+                        value={formData.country}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
+              </section>
 
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Phone Number *
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+              {/* Financial & Banking */}
+              <section className="pt-6 border-t border-neutral-100">
+                <h3 className="text-lg font-semibold text-neutral-900 mb-4">Banking Details (For Billing)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">Bank Name</label>
+                    <input
+                      type="text"
+                      name="bank_name"
+                      value={formData.bank_name}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">Account Number</label>
+                    <input
+                      type="text"
+                      name="account_number"
+                      value={formData.account_number}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">IFSC Code</label>
+                    <input
+                      type="text"
+                      name="ifsc_code"
+                      value={formData.ifsc_code}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                    />
+                  </div>
                 </div>
+              </section>
 
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Website
-                  </label>
-                  <input
-                    type="text"
-                    name="website"
-                    value={formData.website}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+              {/* Contact Info */}
+              <section className="pt-6 border-t border-neutral-100">
+                <h3 className="text-lg font-semibold text-neutral-900 mb-4">Communication</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">Support Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1.5">Support Phone</label>
+                    <input
+                      type="text"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-[#1a6ef5] outline-none"
+                    />
+                  </div>
                 </div>
+              </section>
 
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    GST Number
-                  </label>
-                  <input
-                    type="text"
-                    name="gstNumber"
-                    value={formData.gstNumber}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Company Size
-                  </label>
-                  <select
-                    name="companySize"
-                    value={formData.companySize}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="1-10">1-10 employees</option>
-                    <option value="11-50">11-50 employees</option>
-                    <option value="50-100">50-100 employees</option>
-                    <option value="100+">100+ employees</option>
-                  </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Address *
-                  </label>
-                  <textarea
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  />
-                </div>
+              {/* Status Indicator */}
+              <div className="flex items-center gap-4 pt-4">
+                {saveStatus === 'success' && (
+                  <div className="flex items-center gap-2 text-green-600 font-medium text-sm animate-in fade-in slide-in-from-left-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Settings saved successfully!
+                  </div>
+                )}
+                {saveStatus === 'error' && (
+                  <div className="flex items-center gap-2 text-red-600 font-medium text-sm animate-in fade-in slide-in-from-left-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Failed to save settings. Please check your inputs.
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -277,7 +453,7 @@ export function EnhancedSettings() {
                     name="currency"
                     value={formData.currency}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   >
                     <option value="INR">INR (₹)</option>
                     <option value="USD">USD ($)</option>
@@ -294,7 +470,7 @@ export function EnhancedSettings() {
                     name="gstPercentage"
                     value={formData.gstPercentage}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   />
                 </div>
 
@@ -307,7 +483,7 @@ export function EnhancedSettings() {
                     name="defaultLateFee"
                     value={formData.defaultLateFee}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   />
                 </div>
 
@@ -320,7 +496,7 @@ export function EnhancedSettings() {
                     name="securityDepositMultiple"
                     value={formData.securityDepositMultiple}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   />
                 </div>
 
@@ -333,7 +509,7 @@ export function EnhancedSettings() {
                     name="defaultRentalDiscount"
                     value={formData.defaultRentalDiscount}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   />
                 </div>
 
@@ -346,7 +522,7 @@ export function EnhancedSettings() {
                     name="paymentTerms"
                     value={formData.paymentTerms}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   />
                 </div>
 
@@ -359,7 +535,7 @@ export function EnhancedSettings() {
                     name="earlyPaymentDiscount"
                     value={formData.earlyPaymentDiscount}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   />
                 </div>
               </div>
@@ -382,7 +558,7 @@ export function EnhancedSettings() {
                     name="emailNotifications"
                     checked={formData.emailNotifications}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -396,7 +572,7 @@ export function EnhancedSettings() {
                     name="smsNotifications"
                     checked={formData.smsNotifications}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -410,7 +586,7 @@ export function EnhancedSettings() {
                     name="rentalReminders"
                     checked={formData.rentalReminders}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -424,7 +600,7 @@ export function EnhancedSettings() {
                     name="paymentReminders"
                     checked={formData.paymentReminders}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -438,7 +614,7 @@ export function EnhancedSettings() {
                     name="leadNotifications"
                     checked={formData.leadNotifications}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -452,7 +628,7 @@ export function EnhancedSettings() {
                     name="overdueAlerts"
                     checked={formData.overdueAlerts}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -466,7 +642,7 @@ export function EnhancedSettings() {
                     name="lowStockAlerts"
                     checked={formData.lowStockAlerts}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
               </div>
@@ -489,7 +665,7 @@ export function EnhancedSettings() {
                     name="twoFactorAuth"
                     checked={formData.twoFactorAuth}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -503,7 +679,7 @@ export function EnhancedSettings() {
                     name="ipWhitelisting"
                     checked={formData.ipWhitelisting}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -517,7 +693,7 @@ export function EnhancedSettings() {
                     name="auditLogging"
                     checked={formData.auditLogging}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -530,7 +706,7 @@ export function EnhancedSettings() {
                     name="sessionTimeout"
                     value={formData.sessionTimeout}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   />
                 </div>
 
@@ -543,7 +719,7 @@ export function EnhancedSettings() {
                     name="passwordExpiry"
                     value={formData.passwordExpiry}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   />
                 </div>
               </div>
@@ -566,7 +742,7 @@ export function EnhancedSettings() {
                     name="welcomeEmailEnabled"
                     checked={formData.welcomeEmailEnabled}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -580,7 +756,7 @@ export function EnhancedSettings() {
                     name="invoiceEmailEnabled"
                     checked={formData.invoiceEmailEnabled}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -594,12 +770,12 @@ export function EnhancedSettings() {
                     name="reminderEmailEnabled"
                     checked={formData.reminderEmailEnabled}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
                 <div className="mt-6">
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                  <button className="px-4 py-2 bg-[#1a6ef5] text-white rounded-lg hover:bg-blue-700 transition-colors">
                     Customize Email Templates
                   </button>
                 </div>
@@ -615,7 +791,7 @@ export function EnhancedSettings() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <Calendar className="w-8 h-8 text-blue-600" />
+                    <Calendar className="w-8 h-8 text-[#1a6ef5]" />
                     <div>
                       <p className="font-medium text-neutral-900">Google Calendar</p>
                       <p className="text-sm text-neutral-600">Sync rentals with Google Calendar</p>
@@ -626,7 +802,7 @@ export function EnhancedSettings() {
                     name="googleCalendarSync"
                     checked={formData.googleCalendarSync}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -643,7 +819,7 @@ export function EnhancedSettings() {
                     name="whatsappIntegration"
                     checked={formData.whatsappIntegration}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -660,7 +836,7 @@ export function EnhancedSettings() {
                     name="slackNotifications"
                     checked={formData.slackNotifications}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
               </div>
@@ -683,7 +859,7 @@ export function EnhancedSettings() {
                     name="autoInvoiceGeneration"
                     checked={formData.autoInvoiceGeneration}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -697,7 +873,7 @@ export function EnhancedSettings() {
                     name="autoReminderSending"
                     checked={formData.autoReminderSending}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -711,7 +887,7 @@ export function EnhancedSettings() {
                     name="allowPartialPayments"
                     checked={formData.allowPartialPayments}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -725,7 +901,7 @@ export function EnhancedSettings() {
                     name="requireSecurityDeposit"
                     checked={formData.requireSecurityDeposit}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
               </div>
@@ -746,7 +922,7 @@ export function EnhancedSettings() {
                     name="theme"
                     value={formData.theme}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   >
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
@@ -770,7 +946,7 @@ export function EnhancedSettings() {
                       type="text"
                       value={formData.accentColor}
                       onChange={handleChange}
-                      className="flex-1 px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                     />
                   </div>
                 </div>
@@ -794,7 +970,7 @@ export function EnhancedSettings() {
                     name="autoBackup"
                     checked={formData.autoBackup}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-[#1a6ef5] rounded"
                   />
                 </div>
 
@@ -806,7 +982,7 @@ export function EnhancedSettings() {
                     name="backupFrequency"
                     value={formData.backupFrequency}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   >
                     <option value="hourly">Hourly</option>
                     <option value="daily">Daily</option>
@@ -824,12 +1000,12 @@ export function EnhancedSettings() {
                     name="dataRetention"
                     value={formData.dataRetention}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a6ef5]"
                   />
                 </div>
 
                 <div className="flex gap-3 mt-6">
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                  <button className="px-4 py-2 bg-[#1a6ef5] text-white rounded-lg hover:bg-blue-700 transition-colors">
                     Backup Now
                   </button>
                   <button className="px-4 py-2 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors">

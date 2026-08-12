@@ -460,7 +460,7 @@ export function ActivityLogs() {
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   return (
-    <div>
+    <div style={{ padding: "24px" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600&display=swap');
         .al-root * { font-family: 'DM Sans', sans-serif; box-sizing: border-box; }

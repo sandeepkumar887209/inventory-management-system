@@ -31,9 +31,7 @@ class Demo(AuditModel):
     )
 
     assigned_date        = models.DateField()
-    expected_return_date = models.DateField()
     actual_return_date   = models.DateField(null=True, blank=True)
-    duration_days        = models.PositiveIntegerField(default=7)
 
     status  = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ONGOING")
     purpose = models.CharField(max_length=50, choices=PURPOSE_CHOICES, default="general_evaluation")

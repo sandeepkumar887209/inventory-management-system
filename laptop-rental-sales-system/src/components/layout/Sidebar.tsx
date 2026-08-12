@@ -16,10 +16,10 @@ import {
   Briefcase,
   ChevronLeft,
   ChevronRight,
-  Activity,
   Bell,
   ChevronDown,
   Check,
+  CheckSquare,
   Zap,
   TestTube2,
 } from "lucide-react";
@@ -36,67 +36,68 @@ const MODULES: {
   accentBorder: string;
   defaultPath: string;
 }[] = [
-  {
-    key: "erp",
-    label: "ERP",
-    description: "Operations & Sales",
-    icon: Briefcase,
-    accent: "#2563eb",
-    accentBg: "#eff6ff",
-    accentBorder: "#bfdbfe",
-    defaultPath: "/",
-  },
-  {
-    key: "crm",
-    label: "CRM",
-    description: "Leads & Pipeline",
-    icon: Users2,
-    accent: "#7c3aed",
-    accentBg: "#f5f3ff",
-    accentBorder: "#ddd6fe",
-    defaultPath: "/crm/leads",
-  },
-  {
-    key: "accounts",
-    label: "Accounts",
-    description: "Billing & Finance",
-    icon: BookOpen,
-    accent: "#059669",
-    accentBg: "#ecfdf5",
-    accentBorder: "#a7f3d0",
-    defaultPath: "/accounts",
-  },
-];
+    {
+      key: "erp",
+      label: "ERP",
+      description: "Operations & Sales",
+      icon: Briefcase,
+      accent: "#2563eb",
+      accentBg: "#eff6ff",
+      accentBorder: "#bfdbfe",
+      defaultPath: "/",
+    },
+    {
+      key: "crm",
+      label: "CRM",
+      description: "Leads & Pipeline",
+      icon: Users2,
+      accent: "#7c3aed",
+      accentBg: "#f5f3ff",
+      accentBorder: "#ddd6fe",
+      defaultPath: "/crm/leads",
+    },
+    {
+      key: "accounts",
+      label: "Accounts",
+      description: "Billing & Finance",
+      icon: BookOpen,
+      accent: "#059669",
+      accentBg: "#ecfdf5",
+      accentBorder: "#a7f3d0",
+      defaultPath: "/accounts",
+    },
+  ];
 
 const MENUS: Record<
   Module,
   { label: string; icon: React.ElementType; path: string; badge?: string }[]
 > = {
   erp: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/"                    },
-    { label: "Inventory", icon: Laptop,          path: "/inventory"            },
-    { label: "Rentals",   icon: Calendar,         path: "/rentals"              },
-    { label: "Demos",     icon: TestTube2,        path: "/demos"                },
-    { label: "Sales",     icon: ShoppingCart,     path: "/sales"                },
-    { label: "Customers", icon: Users,            path: "/customers"            },
-    { label: "Suppliers", icon: Building2,        path: "/inventory/suppliers"  },
-    { label: "Reports",   icon: BarChart3,         path: "/reports"              },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+    { label: "Inventory", icon: Laptop, path: "/inventory" },
+    { label: "Rentals", icon: Calendar, path: "/rentals" },
+    { label: "Demos", icon: TestTube2, path: "/demos" },
+    { label: "Sales", icon: ShoppingCart, path: "/sales" },
+    { label: "Customers", icon: Users, path: "/customers" },
+    { label: "Suppliers", icon: Building2, path: "/inventory/suppliers" },
+    { label: "Reports", icon: BarChart3, path: "/reports" },
   ],
   crm: [
-    { label: "Dashboard",  icon: LayoutDashboard, path: "/crm"                  },
-    { label: "Leads",      icon: Users2,           path: "/crm/leads"            },
-    { label: "Pipeline",   icon: TrendingUp,       path: "/crm/pipeline"         },
-    { label: "Activities", icon: Activity,         path: "/crm/activities"       },
-    { label: "Follow-ups", icon: Bell,             path: "/crm/followups", badge: "3" },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/crm" },
+    { label: "Leads", icon: Users2, path: "/crm/leads" },
+    { label: "Pipeline", icon: TrendingUp, path: "/crm/pipeline" },
+    { label: "To-Do", icon: CheckSquare, path: "/crm/todos" },
   ],
   accounts: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/accounts"             },
-    { label: "Invoices",  icon: FileText,         path: "/accounts/invoices"    },
-    { label: "Payments",  icon: Receipt,          path: "/accounts/payments"    },
-    { label: "Ledger",    icon: BookOpen,         path: "/accounts/ledger"      },
-    { label: "Reports",   icon: BarChart3,         path: "/accounts/reports"     },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/accounts" },
+    { label: "Invoices", icon: FileText, path: "/accounts/invoices" },
+    { label: "Payments", icon: Receipt, path: "/accounts/payments" },
+    { label: "Ledger", icon: BookOpen, path: "/accounts/ledger" },
+    { label: "Reports", icon: BarChart3, path: "/accounts/reports" },
   ],
 };
+
+import { useIdentity } from "../../context/IdentityContext";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -106,6 +107,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { company, isAdmin } = useIdentity();
   const [activeModule, setActiveModule] = useState<Module>("erp");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -134,7 +136,14 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
   const mod = MODULES.find((m) => m.key === activeModule)!;
   const ModIcon = mod.icon;
-  const menuItems = MENUS[activeModule];
+
+  // RBAC: Filter menu items
+  const menuItems = MENUS[activeModule].filter(item => {
+    if (!isAdmin) {
+      if (item.label === "Reports" || item.label === "Suppliers") return false;
+    }
+    return true;
+  });
 
   const isActive = (path: string) => {
     if (path === "/" || path === "/crm" || path === "/accounts") {
@@ -147,6 +156,10 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
     setDropdownOpen(false);
     navigate(MODULES.find((m) => m.key === key)!.defaultPath);
   };
+
+  const companyLogo = company?.logo
+    ? (company.logo.startsWith('http') ? company.logo : `http://127.0.0.1:8000${company.logo}`)
+    : null;
 
   return (
     <aside
@@ -180,34 +193,31 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       {/* Logo */}
       <div
         style={{
-          height: "64px",
+          height: "120px",
           display: "flex",
           alignItems: "center",
-          padding: collapsed ? "0 20px" : "0 18px",
+          justifyContent: "center",
+          padding: collapsed ? "14px" : "14px 20px",
           borderBottom: "1px solid #f3f4f6",
-          gap: "10px",
           flexShrink: 0,
         }}
       >
         <div
           style={{
-            width: "34px", height: "34px", borderRadius: "10px",
-            background: mod.accent, display: "flex", alignItems: "center",
-            justifyContent: "center", flexShrink: 0, transition: "background 0.3s",
+            width: "100%", height: "100%",
+            borderRadius: companyLogo ? "0" : "10px",
+            background: companyLogo ? "transparent" : mod.accent,
+            display: "flex", alignItems: "center",
+            justifyContent: "center", transition: "all 0.3s",
+            overflow: "hidden"
           }}
         >
-          <Laptop size={17} color="#fff" strokeWidth={2.2} />
+          {companyLogo ? (
+            <img src={companyLogo} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          ) : (
+            <Building2 size={collapsed ? 20 : 28} color="#fff" strokeWidth={2.2} />
+          )}
         </div>
-        {!collapsed && (
-          <div style={{ overflow: "hidden" }}>
-            <div style={{ fontWeight: 700, fontSize: "15px", color: "#111827", letterSpacing: "-0.3px", whiteSpace: "nowrap", lineHeight: 1.2 }}>
-              Mr. Laptop
-            </div>
-            <div style={{ fontSize: "10px", color: "#9ca3af", fontWeight: 500, letterSpacing: "0.3px", textTransform: "uppercase" }}>
-              Management Suite
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Module switcher */}
@@ -485,7 +495,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           )}
           {collapsed
             ? <ChevronRight size={14} color="#9ca3af" />
-            : <ChevronLeft  size={14} color="#9ca3af" />
+            : <ChevronLeft size={14} color="#9ca3af" />
           }
         </button>
       </div>

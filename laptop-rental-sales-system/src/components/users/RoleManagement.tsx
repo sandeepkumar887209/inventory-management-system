@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Shield, Check, X } from 'lucide-react';
+import { Shield, Check, X, Loader2 } from 'lucide-react';
+import { updateUserApi } from '../../services/auth';
 
 interface Permission {
   id: string;
@@ -9,136 +10,148 @@ interface Permission {
 }
 
 interface RoleManagementProps {
-  user: any;
-  onSave: (permissions: string[]) => void;
+  user: any; // UserProfile API shape: { id, username, full_name, role_title, ... }
+  onSave: () => void;
   onCancel: () => void;
 }
 
+// Default permissions granted per role (frontend-side logical mapping)
+const ROLE_PERMISSION_MAP: Record<string, string[]> = {
+  Admin: ['all'],
+  'Sales Manager': [
+    'dashboard_view', 'inventory_view', 'rentals_view', 'rentals_create', 'rentals_edit',
+    'rentals_cancel', 'sales_view', 'sales_create', 'sales_edit', 'customers_view',
+    'customers_create', 'customers_edit', 'invoices_view', 'invoices_create', 'reports_view',
+    'reports_export', 'users_view',
+  ],
+  'Sales Executive': [
+    'dashboard_view', 'inventory_view', 'rentals_view', 'rentals_create',
+    'sales_view', 'sales_create', 'customers_view', 'customers_create', 'invoices_view',
+  ],
+  Operations: [
+    'dashboard_view', 'inventory_view', 'inventory_edit', 'rentals_view', 'rentals_edit',
+    'rentals_cancel', 'customers_view',
+  ],
+  'Inventory Manager': [
+    'dashboard_view', 'inventory_view', 'inventory_create', 'inventory_edit', 'inventory_delete',
+  ],
+  Accountant: [
+    'dashboard_view', 'invoices_view', 'invoices_create', 'invoices_edit', 'invoices_delete',
+    'reports_view', 'reports_export',
+  ],
+  Support: ['dashboard_view', 'customers_view', 'rentals_view', 'invoices_view'],
+  Staff: ['dashboard_view'],
+};
+
+const availablePermissions: Permission[] = [
+  { id: 'dashboard_view', name: 'View Dashboard', description: 'Access main dashboard and analytics', category: 'Dashboard' },
+  { id: 'inventory_view', name: 'View Inventory', description: 'View laptop inventory', category: 'Inventory' },
+  { id: 'inventory_create', name: 'Create Inventory', description: 'Add new laptops to inventory', category: 'Inventory' },
+  { id: 'inventory_edit', name: 'Edit Inventory', description: 'Modify existing inventory items', category: 'Inventory' },
+  { id: 'inventory_delete', name: 'Delete Inventory', description: 'Remove items from inventory', category: 'Inventory' },
+  { id: 'rentals_view', name: 'View Rentals', description: 'View rental records', category: 'Rentals' },
+  { id: 'rentals_create', name: 'Create Rentals', description: 'Create new rental agreements', category: 'Rentals' },
+  { id: 'rentals_edit', name: 'Edit Rentals', description: 'Modify rental agreements', category: 'Rentals' },
+  { id: 'rentals_cancel', name: 'Cancel Rentals', description: 'Cancel rental agreements', category: 'Rentals' },
+  { id: 'sales_view', name: 'View Sales', description: 'View sales records', category: 'Sales' },
+  { id: 'sales_create', name: 'Create Sales', description: 'Process new sales', category: 'Sales' },
+  { id: 'sales_edit', name: 'Edit Sales', description: 'Modify sales records', category: 'Sales' },
+  { id: 'sales_delete', name: 'Delete Sales', description: 'Remove sales records', category: 'Sales' },
+  { id: 'customers_view', name: 'View Customers', description: 'View customer information', category: 'Customers' },
+  { id: 'customers_create', name: 'Create Customers', description: 'Add new customers', category: 'Customers' },
+  { id: 'customers_edit', name: 'Edit Customers', description: 'Modify customer information', category: 'Customers' },
+  { id: 'customers_delete', name: 'Delete Customers', description: 'Remove customer records', category: 'Customers' },
+  { id: 'invoices_view', name: 'View Invoices', description: 'View invoices and payments', category: 'Invoices' },
+  { id: 'invoices_create', name: 'Create Invoices', description: 'Generate new invoices', category: 'Invoices' },
+  { id: 'invoices_edit', name: 'Edit Invoices', description: 'Modify invoices', category: 'Invoices' },
+  { id: 'invoices_delete', name: 'Delete Invoices', description: 'Remove invoices', category: 'Invoices' },
+  { id: 'reports_view', name: 'View Reports', description: 'Access reports and analytics', category: 'Reports' },
+  { id: 'reports_export', name: 'Export Reports', description: 'Download and export reports', category: 'Reports' },
+  { id: 'users_view', name: 'View Users', description: 'View user accounts', category: 'Users' },
+  { id: 'users_create', name: 'Create Users', description: 'Add new user accounts', category: 'Users' },
+  { id: 'users_edit', name: 'Edit Users', description: 'Modify user accounts', category: 'Users' },
+  { id: 'users_delete', name: 'Delete Users', description: 'Remove user accounts', category: 'Users' },
+  { id: 'users_permissions', name: 'Manage Permissions', description: 'Modify user permissions', category: 'Users' },
+  { id: 'settings_view', name: 'View Settings', description: 'Access system settings', category: 'Settings' },
+  { id: 'settings_edit', name: 'Edit Settings', description: 'Modify system settings', category: 'Settings' },
+];
+
+const getInitialPermissions = (roleTitle: string): string[] => {
+  const rolePerms = ROLE_PERMISSION_MAP[roleTitle];
+  if (!rolePerms) return [];
+  if (rolePerms.includes('all')) return availablePermissions.map(p => p.id);
+  return rolePerms;
+};
+
 export const RoleManagement: React.FC<RoleManagementProps> = ({ user, onSave, onCancel }) => {
-  // Available permissions grouped by category
-  const availablePermissions: Permission[] = [
-    // Dashboard
-    { id: 'dashboard_view', name: 'View Dashboard', description: 'Access main dashboard and analytics', category: 'Dashboard' },
-    
-    // Inventory
-    { id: 'inventory_view', name: 'View Inventory', description: 'View laptop inventory', category: 'Inventory' },
-    { id: 'inventory_create', name: 'Create Inventory', description: 'Add new laptops to inventory', category: 'Inventory' },
-    { id: 'inventory_edit', name: 'Edit Inventory', description: 'Modify existing inventory items', category: 'Inventory' },
-    { id: 'inventory_delete', name: 'Delete Inventory', description: 'Remove items from inventory', category: 'Inventory' },
-    
-    // Rentals
-    { id: 'rentals_view', name: 'View Rentals', description: 'View rental records', category: 'Rentals' },
-    { id: 'rentals_create', name: 'Create Rentals', description: 'Create new rental agreements', category: 'Rentals' },
-    { id: 'rentals_edit', name: 'Edit Rentals', description: 'Modify rental agreements', category: 'Rentals' },
-    { id: 'rentals_cancel', name: 'Cancel Rentals', description: 'Cancel rental agreements', category: 'Rentals' },
-    
-    // Sales
-    { id: 'sales_view', name: 'View Sales', description: 'View sales records', category: 'Sales' },
-    { id: 'sales_create', name: 'Create Sales', description: 'Process new sales', category: 'Sales' },
-    { id: 'sales_edit', name: 'Edit Sales', description: 'Modify sales records', category: 'Sales' },
-    { id: 'sales_delete', name: 'Delete Sales', description: 'Remove sales records', category: 'Sales' },
-    
-    // Customers
-    { id: 'customers_view', name: 'View Customers', description: 'View customer information', category: 'Customers' },
-    { id: 'customers_create', name: 'Create Customers', description: 'Add new customers', category: 'Customers' },
-    { id: 'customers_edit', name: 'Edit Customers', description: 'Modify customer information', category: 'Customers' },
-    { id: 'customers_delete', name: 'Delete Customers', description: 'Remove customer records', category: 'Customers' },
-    
-    // Invoices
-    { id: 'invoices_view', name: 'View Invoices', description: 'View invoices and payments', category: 'Invoices' },
-    { id: 'invoices_create', name: 'Create Invoices', description: 'Generate new invoices', category: 'Invoices' },
-    { id: 'invoices_edit', name: 'Edit Invoices', description: 'Modify invoices', category: 'Invoices' },
-    { id: 'invoices_delete', name: 'Delete Invoices', description: 'Remove invoices', category: 'Invoices' },
-    
-    // Reports
-    { id: 'reports_view', name: 'View Reports', description: 'Access reports and analytics', category: 'Reports' },
-    { id: 'reports_export', name: 'Export Reports', description: 'Download and export reports', category: 'Reports' },
-    
-    // Users
-    { id: 'users_view', name: 'View Users', description: 'View user accounts', category: 'Users' },
-    { id: 'users_create', name: 'Create Users', description: 'Add new user accounts', category: 'Users' },
-    { id: 'users_edit', name: 'Edit Users', description: 'Modify user accounts', category: 'Users' },
-    { id: 'users_delete', name: 'Delete Users', description: 'Remove user accounts', category: 'Users' },
-    { id: 'users_permissions', name: 'Manage Permissions', description: 'Modify user permissions', category: 'Users' },
-    
-    // Settings
-    { id: 'settings_view', name: 'View Settings', description: 'Access system settings', category: 'Settings' },
-    { id: 'settings_edit', name: 'Edit Settings', description: 'Modify system settings', category: 'Settings' },
-  ];
+  const [selectedRole, setSelectedRole] = useState<string>(user.role_title || 'Staff');
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
+    getInitialPermissions(user.role_title || 'Staff')
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // Get initial permissions based on user's current permissions
-  const getInitialPermissions = () => {
-    if (user.permissions.includes('all')) {
-      return availablePermissions.map(p => p.id);
-    }
-    return user.permissions || [];
-  };
-
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(getInitialPermissions());
-
-  // Group permissions by category
   const groupedPermissions = availablePermissions.reduce((acc, permission) => {
-    if (!acc[permission.category]) {
-      acc[permission.category] = [];
-    }
+    if (!acc[permission.category]) acc[permission.category] = [];
     acc[permission.category].push(permission);
     return acc;
   }, {} as Record<string, Permission[]>);
 
   const categories = Object.keys(groupedPermissions);
 
+  // When role changes, auto-populate permissions based on role defaults
+  const handleRoleChange = (role: string) => {
+    setSelectedRole(role);
+    setSelectedPermissions(getInitialPermissions(role));
+  };
+
   const togglePermission = (permissionId: string) => {
-    setSelectedPermissions(prev => {
-      if (prev.includes(permissionId)) {
-        return prev.filter(id => id !== permissionId);
-      } else {
-        return [...prev, permissionId];
-      }
-    });
+    setSelectedPermissions(prev =>
+      prev.includes(permissionId) ? prev.filter(id => id !== permissionId) : [...prev, permissionId]
+    );
   };
 
   const toggleCategoryAll = (category: string) => {
-    const categoryPermissions = groupedPermissions[category].map(p => p.id);
-    const allSelected = categoryPermissions.every(id => selectedPermissions.includes(id));
-
+    const categoryIds = groupedPermissions[category].map(p => p.id);
+    const allSelected = categoryIds.every(id => selectedPermissions.includes(id));
     if (allSelected) {
-      // Remove all category permissions
-      setSelectedPermissions(prev => prev.filter(id => !categoryPermissions.includes(id)));
+      setSelectedPermissions(prev => prev.filter(id => !categoryIds.includes(id)));
     } else {
-      // Add all category permissions
       setSelectedPermissions(prev => {
-        const newPermissions = [...prev];
-        categoryPermissions.forEach(id => {
-          if (!newPermissions.includes(id)) {
-            newPermissions.push(id);
-          }
-        });
-        return newPermissions;
+        const next = [...prev];
+        categoryIds.forEach(id => { if (!next.includes(id)) next.push(id); });
+        return next;
       });
     }
   };
 
-  const selectAll = () => {
-    setSelectedPermissions(availablePermissions.map(p => p.id));
-  };
+  const selectAll = () => setSelectedPermissions(availablePermissions.map(p => p.id));
+  const deselectAll = () => setSelectedPermissions([]);
 
-  const deselectAll = () => {
-    setSelectedPermissions([]);
-  };
-
-  const handleSubmit = () => {
-    onSave(selectedPermissions);
-  };
-
-  const isCategoryFullySelected = (category: string) => {
-    const categoryPermissions = groupedPermissions[category].map(p => p.id);
-    return categoryPermissions.every(id => selectedPermissions.includes(id));
-  };
+  const isCategoryFullySelected = (category: string) =>
+    groupedPermissions[category].every(p => selectedPermissions.includes(p.id));
 
   const isCategoryPartiallySelected = (category: string) => {
-    const categoryPermissions = groupedPermissions[category].map(p => p.id);
-    const selectedCount = categoryPermissions.filter(id => selectedPermissions.includes(id)).length;
-    return selectedCount > 0 && selectedCount < categoryPermissions.length;
+    const ids = groupedPermissions[category].map(p => p.id);
+    const count = ids.filter(id => selectedPermissions.includes(id)).length;
+    return count > 0 && count < ids.length;
+  };
+
+  const handleSubmit = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      // Save the role_title back to the backend
+      await updateUserApi(user.id, { role_title: selectedRole });
+      onSave();
+    } catch (err: any) {
+      const msg = err?.response?.data
+        ? Object.values(err.response.data).flat().join(' ')
+        : 'Failed to save permissions.';
+      setError(msg as string);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -148,7 +161,8 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ user, onSave, on
         <div>
           <h2 className="text-xl font-bold text-neutral-900 mb-1">Manage Permissions</h2>
           <p className="text-sm text-neutral-600">
-            Configure access permissions for <span className="font-medium">{user.name}</span> ({user.role})
+            Configure access permissions for{' '}
+            <span className="font-medium">{user.full_name || user.username}</span>
           </p>
         </div>
         <button
@@ -157,6 +171,29 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ user, onSave, on
         >
           <X className="w-5 h-5" />
         </button>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Role Selector */}
+      <div>
+        <label className="block text-sm font-medium text-neutral-700 mb-2">
+          Role — changes will auto-populate default permissions below
+        </label>
+        <select
+          value={selectedRole}
+          onChange={e => handleRoleChange(e.target.value)}
+          className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {Object.keys(ROLE_PERMISSION_MAP).map(role => (
+            <option key={role} value={role}>{role}</option>
+          ))}
+        </select>
       </div>
 
       {/* Quick Actions */}
@@ -177,12 +214,12 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ user, onSave, on
         </button>
         <div className="ml-auto text-sm text-neutral-600">
           <span className="font-medium">{selectedPermissions.length}</span> of{' '}
-          <span className="font-medium">{availablePermissions.length}</span> permissions selected
+          <span className="font-medium">{availablePermissions.length}</span> selected
         </div>
       </div>
 
       {/* Permissions by Category */}
-      <div className="max-h-[500px] overflow-y-auto space-y-4 pr-2">
+      <div className="max-h-[460px] overflow-y-auto space-y-4 pr-1">
         {categories.map(category => (
           <div key={category} className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
             {/* Category Header */}
@@ -213,7 +250,7 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ user, onSave, on
               <Shield className="w-5 h-5 text-neutral-400" />
             </div>
 
-            {/* Permissions List */}
+            {/* Permission Items */}
             <div className="p-4 space-y-3">
               {groupedPermissions[category].map(permission => (
                 <div
@@ -245,12 +282,15 @@ export const RoleManagement: React.FC<RoleManagementProps> = ({ user, onSave, on
       <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-neutral-200">
         <button
           onClick={handleSubmit}
-          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          disabled={loading}
+          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-60"
         >
+          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           Save Permissions
         </button>
         <button
           onClick={onCancel}
+          disabled={loading}
           className="flex-1 px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-medium"
         >
           Cancel

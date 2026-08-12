@@ -153,6 +153,8 @@ class StockMovement(AuditModel):
         ("MAINTENANCE_IN",   "Returned from Maintenance"),
         ("SUPPLIER_RETURN",  "Returned to Supplier"),
         ("WRITTEN_OFF",      "Written Off"),
+        ("DEMO_OUT",         "Assigned for Demo"),
+        ("DEMO_RETURN",      "Returned from Demo"),
     )
 
     laptop        = models.ForeignKey(Laptop, on_delete=models.CASCADE, related_name="movements")

@@ -13,7 +13,7 @@ class DemoItemInline(admin.TabularInline):
 class DemoAdmin(admin.ModelAdmin):
     list_display  = (
         "id", "customer", "status", "purpose",
-        "assigned_date", "expected_return_date",
+        "assigned_date",
         "feedback_received", "created_at",
     )
     list_filter   = ("status", "purpose", "feedback_received", "requires_training", "delivery_required")
@@ -28,7 +28,7 @@ class DemoAdmin(admin.ModelAdmin):
             "fields": ("customer", "status", "purpose"),
         }),
         ("Dates", {
-            "fields": ("assigned_date", "expected_return_date", "actual_return_date", "duration_days"),
+            "fields": ("assigned_date", "actual_return_date"),
         }),
         ("Details", {
             "fields": ("specific_requirements", "requires_training", "delivery_required", "delivery_address"),

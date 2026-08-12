@@ -2,6 +2,7 @@
 apps/demo/serializers.py — with laptop + customer snapshot support
 """
 
+from django.db import transaction
 from rest_framework import serializers
 from .models import Demo, DemoItem
 from apps.inventory.models import Laptop, StockMovement
@@ -33,7 +34,6 @@ class DemoItemSerializer(serializers.ModelSerializer):
     demo_id              = serializers.IntegerField(source="demo.id",               read_only=True)
     demo_status          = serializers.CharField(source="demo.status",              read_only=True)
     assigned_date        = serializers.DateField(source="demo.assigned_date",       read_only=True)
-    expected_return_date = serializers.DateField(source="demo.expected_return_date",read_only=True)
     actual_return_date   = serializers.DateField(source="demo.actual_return_date",  read_only=True)
 
     # Convenience read-only helpers built from the snapshot
@@ -47,7 +47,7 @@ class DemoItemSerializer(serializers.ModelSerializer):
             # FK / live
             "laptop", "laptop_id",
             # parent demo context
-            "demo_id", "demo_status", "assigned_date", "expected_return_date", "actual_return_date",
+            "demo_id", "demo_status", "assigned_date", "actual_return_date",
             # snapshot — identity
             "snapshot_brand",
             "snapshot_model",
@@ -75,7 +75,7 @@ class DemoItemSerializer(serializers.ModelSerializer):
             "serial",
         ]
         read_only_fields = [
-            "demo_id", "demo_status", "assigned_date", "expected_return_date", "actual_return_date",
+            "demo_id", "demo_status", "assigned_date", "actual_return_date",
             "snapshot_brand", "snapshot_model", "snapshot_serial_number",
             "snapshot_asset_tag", "snapshot_processor", "snapshot_generation",
             "snapshot_ram", "snapshot_storage", "snapshot_gpu", "snapshot_display",
@@ -116,18 +116,30 @@ class DemoSerializer(serializers.ModelSerializer):
         return value
 
     # ── Create ───────────────────────────────────────────────────────────
+    @transaction.atomic
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
-        demo = Demo.objects.create(**validated_data)
 
+        # ── Validate ALL laptops BEFORE creating anything ─────────────────
+        laptops = []
         for item in items_data:
             laptop = item["laptop"]
-
-            if laptop.status not in ("AVAILABLE",):
+            # Re-fetch with a lock to prevent race conditions
+            try:
+                laptop = Laptop.objects.select_for_update().get(pk=laptop.pk)
+            except Laptop.DoesNotExist:
                 raise serializers.ValidationError(
-                    f"Laptop {laptop.serial_number} is not available for demo."
+                    f"Laptop #{laptop.pk} no longer exists."
                 )
+            if laptop.status != "AVAILABLE":
+                raise serializers.ValidationError(
+                    f"Laptop '{laptop.serial_number}' is not available for demo (current status: {laptop.status})."
+                )
+            laptops.append(laptop)
 
+        demo = Demo.objects.create(**validated_data)
+
+        for laptop in laptops:
             # Mark laptop as DEMO
             laptop.status   = "DEMO"
             laptop.customer = demo.customer
@@ -135,7 +147,7 @@ class DemoSerializer(serializers.ModelSerializer):
 
             StockMovement.objects.create(
                 laptop=laptop,
-                movement_type="OUT",
+                movement_type="DEMO_OUT",
                 quantity=1,
                 remarks=f"Demo #{demo.id} — assigned for demo"
             )

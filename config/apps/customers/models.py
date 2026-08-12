@@ -150,6 +150,19 @@ class CustomerHistory(AuditModel):
     # Financial
     amount      = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
+    # ── Transaction snapshot ─────────────────────────────────────────────────
+    # Frozen copy of the Rental / Demo / Sale state at the moment this event
+    # was recorded. Never updated — even if the live record changes later.
+
+    snapshot_status = models.CharField(
+        max_length=50, blank=True,
+        help_text="Status of the Rental/Demo/Sale at the time of this event (e.g. ONGOING, RETURNED)",
+    )
+    snapshot_data = models.JSONField(
+        default=dict, blank=True,
+        help_text="Key fields from the source record frozen at event time (dates, totals, item count, etc.)",
+    )
+
     # Human-readable summary
     note        = models.TextField(blank=True)
 

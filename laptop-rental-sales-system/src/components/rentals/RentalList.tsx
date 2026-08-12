@@ -3,7 +3,7 @@ import { Search, Plus } from "lucide-react";
 import api from "../../services/axios";
 import {
   Card, CardHeader, SectionTitle, Btn, Input, Table,
-  statusBadge, Badge, Spinner, fmtDate, fmtINR, daysDiff, C,
+  statusBadge, Spinner, fmtDate, fmtINR,
 } from "./ui";
 
 const STATUS_FILTERS = [
@@ -37,20 +37,12 @@ export function RentalList({ onNavigate }) {
     }
   };
 
-  /* Overdue detection */
-  const withOverdue = rentals.map((r) => {
-    if (r.status !== "ONGOING" || !r.expected_return_date) return r;
-    const diff = daysDiff(r.expected_return_date);
-    return diff !== null && diff < 0 ? { ...r, _overdue: true } : r;
-  });
-
-  const filtered = withOverdue.filter((r) => {
+  const filtered = rentals.filter((r) => {
     const q   = search.toLowerCase();
     const name = (r.customer_detail?.name ?? "").toLowerCase();
     const matchSearch = !q || name.includes(q) || String(r.id).includes(q);
 
     let matchStatus = filter === "ALL" || r.status === filter;
-    if (filter === "ONGOING" && r._overdue) matchStatus = true;
 
     return matchSearch && matchStatus;
   });
@@ -95,41 +87,7 @@ export function RentalList({ onNavigate }) {
       render: (r) => (
         <span style={{ fontSize: "12px", color: "#888" }}>{fmtDate(r.rent_date ?? r.created_at)}</span>
       ),
-    },
-    {
-      key:    "due",
-      label:  "Expected return",
-      render: (r) => {
-        if (!r.expected_return_date) return <span style={{ color: "#ccc" }}>—</span>;
-        const diff = daysDiff(r.expected_return_date);
-        const isOverdue = r.status === "ONGOING" && diff !== null && diff < 0;
-        return (
-          <span
-            style={{
-              fontSize:   "12px",
-              color:      isOverdue ? C.red.text : diff !== null && diff <= 3 ? C.amber.text : "#888",
-              fontWeight: isOverdue ? 500 : 400,
-            }}
-          >
-            {fmtDate(r.expected_return_date)}
-            {isOverdue && (
-              <span
-                style={{
-                  marginLeft: "6px",
-                  fontSize:   "10px",
-                  background: C.red.bg,
-                  color:      C.red.text,
-                  padding:    "1px 6px",
-                  borderRadius: "99px",
-                }}
-              >
-                {Math.abs(diff)}d overdue
-              </span>
-            )}
-          </span>
-        );
-      },
-    },
+    },,
     {
       key:    "total",
       label:  "Total",
@@ -140,8 +98,7 @@ export function RentalList({ onNavigate }) {
     {
       key:    "status",
       label:  "Status",
-      render: (r) =>
-        r._overdue ? <Badge color="red">Overdue</Badge> : statusBadge(r.status),
+      render: (r) => statusBadge(r.status),
     },
     {
       key:    "actions",

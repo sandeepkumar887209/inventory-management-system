@@ -48,13 +48,12 @@ function ReturnPanel({ customers, onSuccess }: { customers: any[]; onSuccess: ()
     try {
       setLoadingDemo(true);
       const [demoRes, lapRes] = await Promise.all([
-        api.get("/demos/demo/"),
+        api.get(`/demos/demo/?customer=${c.id}&status=ONGOING`),
         api.get(`/inventory/laptops/?status=DEMO&customer=${c.id}`),
       ]);
       const demos = Array.isArray(demoRes.data) ? demoRes.data : demoRes.data.results || [];
-      const active = demos.find((d: any) =>
-        (d.customer === c.id || d.customer_detail?.id === c.id) && d.status === "ONGOING"
-      );
+      // Take the most recent ongoing demo for this customer
+      const active = demos.length > 0 ? demos[0] : null;
       setActiveDemo(active ?? null);
       setDemoLaptops(Array.isArray(lapRes.data) ? lapRes.data : lapRes.data.results || []);
     } catch (e) { console.error(e); }
@@ -142,11 +141,10 @@ function ConvertPanel({ customers, onSuccess }: { customers: any[]; onSuccess: (
     setSelected(c); setActiveDemo(null);
     try {
       setLoadingDemo(true);
-      const res = await api.get("/demos/demo/");
+      const res = await api.get(`/demos/demo/?customer=${c.id}&status=ONGOING`);
       const demos = Array.isArray(res.data) ? res.data : res.data.results || [];
-      const active = demos.find((d: any) =>
-        (d.customer === c.id || d.customer_detail?.id === c.id) && d.status === "ONGOING"
-      );
+      // Take the most recent ongoing demo for this customer
+      const active = demos.length > 0 ? demos[0] : null;
       setActiveDemo(active ?? null);
     } catch (e) { console.error(e); }
     finally { setLoadingDemo(false); }

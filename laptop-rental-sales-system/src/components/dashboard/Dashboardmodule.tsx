@@ -206,7 +206,7 @@ function OverviewTab({ data, loading, onNavigate }: any) {
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px" }}>
         <KpiCard label="Total Inventory"   value={kpis.total}        icon={Laptop}       color="blue"   sub="Units tracked"   />
-        <KpiCard label="Active Rentals"    value={kpis.rented}       icon={Calendar}     color="teal"   sub={kpis.overdue > 0 ? `${kpis.overdue} overdue` : "On track"} subUp={kpis.overdue === 0} />
+        <KpiCard label="Active Rentals"    value={kpis.rented}       icon={Calendar}     color="teal"   sub="On track" subUp={true} />
         <KpiCard label="Total Revenue"     value={fmtINR(kpis.totalRevenue)} icon={IndianRupee} color="purple" />
         <KpiCard label="Customers"         value={kpis.customers}    icon={Users}        color="amber"  />
       </div>
@@ -218,23 +218,6 @@ function OverviewTab({ data, loading, onNavigate }: any) {
         <KpiCard label="Rental Revenue"    value={fmtINR(kpis.rentalRevenue)} icon={Activity} color="teal" />
       </div>
 
-      {/* Alert banner */}
-      {kpis.overdue > 0 && (
-        <div style={{
-          background: D.amber.bg, border: `1px solid ${D.amber.border}`, borderRadius: "12px",
-          padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <AlertTriangle size={16} color={D.amber.solid} />
-            <span style={{ fontSize: "13px", color: D.amber.text, fontWeight: 500 }}>
-              {kpis.overdue} rental{kpis.overdue > 1 ? "s are" : " is"} overdue and require immediate attention
-            </span>
-          </div>
-          <Btn size="sm" onClick={() => onNavigate("/rentals/alerts")}>
-            View Alerts <ChevronRight size={12} />
-          </Btn>
-        </div>
-      )}
 
       {/* Charts row */}
       <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "16px" }}>
@@ -303,39 +286,7 @@ function OverviewTab({ data, loading, onNavigate }: any) {
 
       {/* Bottom row: Alerts + Activity */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-        {/* Rental alerts */}
-        <Card>
-          <CardHeader title="Rental Alerts" sub="Upcoming returns & overdue" right={
-            <Btn size="sm" onClick={() => onNavigate("/rentals/alerts")}>View all</Btn>
-          } />
-          <div style={{ padding: "0 0 8px" }}>
-            {alerts.length === 0 ? (
-              <div style={{ padding: "24px", textAlign: "center" }}>
-                <CheckCircle size={28} color={D.green.solid} style={{ marginBottom: "8px" }} />
-                <div style={{ fontSize: "13px", color: "#555", fontWeight: 500 }}>All rentals on track</div>
-                <div style={{ fontSize: "11px", color: "#aaa", marginTop: "3px" }}>No alerts at this time</div>
-              </div>
-            ) : alerts.slice(0, 6).map((a: any, i: number) => (
-              <div key={i} style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "10px 18px", borderBottom: i < Math.min(alerts.length, 6) - 1 ? "1px solid #f5f4f1" : "none",
-                fontSize: "13px",
-              }}>
-                <div>
-                  <div style={{ fontWeight: 500, color: "#1a1a1a" }}>{a.customer}</div>
-                  <div style={{ fontSize: "11px", color: "#888", marginTop: "2px" }}>
-                    Due {fmtDate(a.dueDate)}
-                  </div>
-                </div>
-                <Badge color={a.days < 0 ? "red" : a.days <= 2 ? "coral" : "amber"}>
-                  {a.days < 0 ? `${Math.abs(a.days)}d overdue` : a.days === 0 ? "Today" : `${a.days}d left`}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Recent activity */}
+{/* Recent activity */}
         <Card>
           <CardHeader title="Recent Activity" sub="Latest transactions" right={
             <Btn size="sm" onClick={() => onNavigate("/rentals/list")}>View all</Btn>
@@ -714,7 +665,7 @@ function RentalsTab({ data, loading, onNavigate }: any) {
         {[
           { label: "Total Rentals",    value: rentals.length, icon: Calendar,     color: "blue"  },
           { label: "Active Rentals",   value: ongoing.length, icon: Activity,     color: "teal"  },
-          { label: "Overdue",          value: overdue.length, icon: AlertTriangle,color: "red"   },
+          
           { label: "Expiring in 7d",   value: expiringSoon.length, icon: Clock,   color: "amber" },
         ].map((k, i) => <KpiCard key={i} {...k} onClick={() => k.label !== "Total Rentals" ? onNavigate("/rentals/alerts") : onNavigate("/rentals/list")} />)}
       </div>
@@ -772,7 +723,7 @@ function RentalsTab({ data, loading, onNavigate }: any) {
       </div>
 
       {/* Overdue rentals */}
-      {overdue.length > 0 && (
+      {false && (
         <Card>
           <CardHeader
             title={<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1126,7 +1077,6 @@ const TABS = [
   { id: "inventory",  label: "Inventory",  icon: Laptop           },
   { id: "rentals",    label: "Rentals",    icon: Calendar         },
   { id: "customers",  label: "Customers",  icon: Users            },
-  { id: "alerts",     label: "Alerts",     icon: AlertTriangle    },
 ];
 
 /* ─────────────────────────────────────────────
@@ -1207,18 +1157,7 @@ export function DashboardModule() {
   laptops.forEach(l => { statusCounts[l.status] = (statusCounts[l.status] || 0) + 1; });
   const STATUS_LABELS: any = { AVAILABLE: "Available", RENTED: "Rented", SOLD: "Sold", DEMO: "Demo", UNDER_MAINTENANCE: "Maintenance" };
   const statusData = Object.entries(statusCounts).map(([k, v]) => ({ name: STATUS_LABELS[k] || k, value: v }));
-
-  // Rental alerts
-  const today = new Date(); today.setHours(0,0,0,0);
-  const alerts = rentals
-    .filter(r => r.status === "ONGOING" && r.expected_return_date)
-    .map(r => ({
-      customer: r.customer_detail?.name || "Unknown",
-      dueDate: r.expected_return_date,
-      days: daysDiff(r.expected_return_date) || 0,
-    }))
-    .filter(a => a.days <= 7)
-    .sort((a, b) => a.days - b.days);
+  const alerts: any[] = [];
 
   // Recent activity
   const activity = [
@@ -1274,9 +1213,7 @@ export function DashboardModule() {
 
   /* ── Alert badge count ── */
   const alertCount = alerts.length;
-  const overdueCount = kpis.overdue;
-
-  return (
+return (
     <div style={{ minHeight: "100vh", background: "#f8f7f5" }}>
       {/* ── Top nav ── */}
       <div style={{
@@ -1294,7 +1231,7 @@ export function DashboardModule() {
           {TABS.map(tab => {
             const Icon = tab.icon;
             const isActive = tab.id === activeTab;
-            const showBadge = tab.id === "alerts" && (overdueCount + alertCount) > 0;
+            const showBadge = tab.id === "alerts" && (alertCount) > 0;
             return (
               <button
                 key={tab.id}

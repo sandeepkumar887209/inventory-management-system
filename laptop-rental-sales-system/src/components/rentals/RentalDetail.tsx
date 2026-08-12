@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import api from "../../services/axios";
 import {
   Card, CardHeader, Btn, Badge, Spinner,
-  statusBadge, fmtDate, fmtINR, daysDiff, C,
+  statusBadge, fmtDate, fmtINR, C,
 } from "./ui";
 
 export function RentalDetail({ onBack }) {
@@ -77,9 +77,7 @@ export function RentalDetail({ onBack }) {
   if (loading) return <Spinner />;
   if (!rental)  return <div style={{ padding: "40px", color: "#bbb", textAlign: "center" }}>Rental not found.</div>;
 
-  const dueIn  = daysDiff(rental.expected_return_date);
   const isOngoing  = rental.status === "ONGOING";
-  const isOverdue  = isOngoing && dueIn !== null && dueIn < 0;
   const rentedItems = rental.items_detail?.filter((i) => i.laptop?.status === "RENTED") ?? [];
 
   return (
@@ -118,10 +116,7 @@ export function RentalDetail({ onBack }) {
             Rental R-{rental.id}
           </h1>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "8px" }}>
-            {isOverdue ? <Badge color="red">Overdue by {Math.abs(dueIn)}d</Badge> : statusBadge(rental.status)}
-            {isOngoing && !isOverdue && dueIn !== null && dueIn <= 7 && (
-              <Badge color="amber">Due in {dueIn}d</Badge>
-            )}
+            {statusBadge(rental.status)}
           </div>
         </div>
 
@@ -303,7 +298,6 @@ export function RentalDetail({ onBack }) {
           <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px" }}>
             {[
               ["Rent date",    fmtDate(rental.rent_date ?? rental.created_at)],
-              ["Expected return", fmtDate(rental.expected_return_date)],
               ["Subtotal",     fmtINR(rental.subtotal)],
               ["GST",          `${rental.gst}%`],
               ["Total",        fmtINR(rental.total_amount)],

@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Laptop, Mail, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
 
-interface ForgotPasswordProps {
-  onBack: () => void;
-  onResetRequest: (email: string) => void;
-}
-
-export function ForgotPassword({ onBack, onResetRequest }: ForgotPasswordProps) {
+export function ForgotPassword() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -26,7 +23,6 @@ export function ForgotPassword({ onBack, onResetRequest }: ForgotPasswordProps) 
     }
 
     setSuccess(true);
-    onResetRequest(email);
   };
 
   return (
@@ -83,7 +79,7 @@ export function ForgotPassword({ onBack, onResetRequest }: ForgotPasswordProps) 
               {/* Back to Login */}
               <button
                 type="button"
-                onClick={onBack}
+                onClick={() => navigate('/login')}
                 className="w-full flex items-center justify-center gap-2 py-3 text-neutral-600 hover:text-neutral-900 font-medium transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -104,7 +100,7 @@ export function ForgotPassword({ onBack, onResetRequest }: ForgotPasswordProps) 
                 Didn't receive the email? Check your spam folder or try again.
               </p>
               <button
-                onClick={onBack}
+                onClick={() => navigate('/login')}
                 className="flex items-center justify-center gap-2 mx-auto mt-6 text-blue-600 hover:text-blue-700 font-medium"
               >
                 <ArrowLeft className="w-4 h-4" />

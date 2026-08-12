@@ -12,6 +12,7 @@ import RequireAuth         from "./components/auth/RequireAuth";
 import Login               from "./components/auth/Login";
 import { Signup }          from "./components/auth/Signup";
 import { ForgotPassword }  from "./components/auth/ForgotPassword";
+import PendingApproval     from "./components/auth/PendingApproval";
 
 import { DashboardModule }  from "./components/dashboard/DashboardModule";
 import { InventoryModule }  from "./components/inventory/InventoryModule";
@@ -29,8 +30,12 @@ import { CreateInvoice }    from "./components/invoices/CreateInvoice";
 import { UserList }         from "./components/users/UserList";
 import { UserForm }         from "./components/users/UserForm";
 import { RoleManagement }   from "./components/users/RoleManagement";
+import { createUserApi, updateUserApi } from "./services/auth";
 
 import { ActivityLogs } from "./components/audit/ActivityLogs";
+import { UserProfile } from "./components/users/UserProfile";
+import RequireAdmin from "./components/auth/RequireAdmin";
+import { IdentityProvider } from "./context/IdentityContext";
 
 /* ─── Layout ─── */
 function Layout({
@@ -117,13 +122,26 @@ function InvoicesPage() {
 function UsersPage() {
   const [view, setView] = useState<"list" | "form" | "permissions">("list");
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [listRefreshKey, setListRefreshKey] = useState(0);
+
+  const refreshList = () => setListRefreshKey(k => k + 1);
+
+  const handleFormSubmit = async (data: any) => {
+    if (selectedUser) {
+      await updateUserApi(selectedUser.id, data);
+    } else {
+      await createUserApi(data);
+    }
+    refreshList();
+    setView("list");
+  };
 
   if (view === "form") {
     return (
       <div className="p-6 max-w-2xl mx-auto">
         <UserForm
           user={selectedUser}
-          onSubmit={() => setView("list")}
+          onSubmit={handleFormSubmit}
           onCancel={() => setView("list")}
         />
       </div>
@@ -145,6 +163,7 @@ function UsersPage() {
   return (
     <div className="p-6">
       <UserList
+        key={listRefreshKey}
         onAddNew={() => {
           setSelectedUser(null);
           setView("form");
@@ -167,54 +186,62 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <Routes>
+    <IdentityProvider>
+      <Routes>
 
-      {/* Public */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup onSignup={() => {}} onSwitchToLogin={() => {}} />} />
-      <Route path="/forgot-password" element={<ForgotPassword onBack={() => {}} onResetRequest={() => {}} />} />
+        {/* Public */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/pending-approval" element={<PendingApproval />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
-      {/* Protected */}
-      <Route element={<RequireAuth />}>
-        <Route
-          element={
-            <Layout
-              sidebarCollapsed={sidebarCollapsed}
-              toggleSidebar={() => setSidebarCollapsed((c) => !c)}
-            />
-          }
-        >
-          {/* ✅ Dashboard Module */}
-          <Route path="/" element={<DashboardModule />} />
+        {/* Protected */}
+        <Route element={<RequireAuth />}>
+          <Route
+            element={
+              <Layout
+                sidebarCollapsed={sidebarCollapsed}
+                toggleSidebar={() => setSidebarCollapsed((c) => !c)}
+              />
+            }
+          >
+            {/* ✅ Dashboard Module */}
+            <Route path="/" element={<DashboardModule />} />
 
-          {/* Modules */}
-          <Route path="/inventory/*" element={<InventoryModule />} />
-          <Route path="/rentals/*" element={<RentalModule />} />
-          <Route path="/demos/*" element={<DemoModule />} />
-          <Route path="/sales/*" element={<SalesModule />} />
-          <Route path="/customers/*" element={<CustomerModule />} />
+            {/* Modules */}
+            <Route path="/inventory/*" element={<InventoryModule />} />
+            <Route path="/rentals/*" element={<RentalModule />} />
+            <Route path="/demos/*" element={<DemoModule />} />
+            <Route path="/sales/*" element={<SalesModule />} />
+            <Route path="/customers/*" element={<CustomerModule />} />
 
-          {/* CRM */}
-          <Route path="/crm/*" element={<div className="p-6"><CRMPage /></div>} />
+            {/* CRM */}
+            <Route path="/crm/*" element={<CRMPage />} />
 
-          {/* Accounts */}
-          <Route path="/accounts" element={<div className="p-6"><BillingDashboard /></div>} />
-          <Route path="/accounts/invoices" element={<InvoicesPage />} />
-          <Route path="/accounts/payments" element={<div className="p-6"><BillingDashboard /></div>} />
-          <Route path="/accounts/ledger" element={<div className="p-6"><h2>Ledger</h2></div>} />
-          <Route path="/accounts/reports" element={<div className="p-6"><ReportsAnalytics /></div>} />
+            {/* Accounts */}
+            <Route path="/accounts" element={<div className="p-6"><BillingDashboard /></div>} />
+            <Route path="/accounts/invoices" element={<InvoicesPage />} />
+            <Route path="/accounts/payments" element={<div className="p-6"><BillingDashboard /></div>} />
+            <Route path="/accounts/ledger" element={<div className="p-6"><h2>Ledger</h2></div>} />
+            <Route path="/accounts/reports" element={<div className="p-6"><ReportsAnalytics /></div>} />
 
-          {/* Others */}
-          <Route path="/reports" element={<div className="p-6"><ReportsAnalytics /></div>} />
-          <Route path="/users" element={<UsersPage />} />
-          <Route path="/settings" element={<div className="p-6"><EnhancedSettings /></div>} />
-          <Route path="/activity-logs" element={<ActivityLogs />} />
+            {/* My Profile - accessible to all logged in users */}
+            <Route path="/profile" element={<UserProfile />} />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+            {/* 🛡️ Admin Only Routes */}
+            <Route element={<RequireAdmin />}>
+              <Route path="/reports" element={<div className="p-6"><ReportsAnalytics /></div>} />
+              <Route path="/users" element={<UsersPage />} />
+              <Route path="/settings" element={<div className="p-6"><EnhancedSettings /></div>} />
+              <Route path="/activity-logs" element={<ActivityLogs />} />
+            </Route>
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
         </Route>
-      </Route>
 
-    </Routes>
+      </Routes>
+    </IdentityProvider>
   );
 }

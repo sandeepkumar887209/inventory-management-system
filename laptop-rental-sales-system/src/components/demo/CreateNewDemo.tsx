@@ -112,7 +112,6 @@ export function CreateNewDemo({ onSuccess, onCancel }: { onSuccess: () => void; 
 
   // Step 3 fields
   const [assignedDate,   setAssignedDate]   = useState(new Date().toISOString().split("T")[0]);
-  const [duration,       setDuration]       = useState(7);
   const [purpose,        setPurpose]        = useState("");
   const [requirements,   setRequirements]   = useState("");
   const [needsTraining,  setNeedsTraining]  = useState(false);
@@ -120,11 +119,7 @@ export function CreateNewDemo({ onSuccess, onCancel }: { onSuccess: () => void; 
   const [deliveryAddr,   setDeliveryAddr]   = useState("");
   const [agreeTerms,     setAgreeTerms]     = useState(false);
 
-  const returnDate = (() => {
-    if (!assignedDate) return "";
-    const d = new Date(assignedDate); d.setDate(d.getDate() + duration);
-    return d.toISOString().split("T")[0];
-  })();
+
 
   useEffect(() => {
     const load = async () => {
@@ -166,8 +161,6 @@ export function CreateNewDemo({ onSuccess, onCancel }: { onSuccess: () => void; 
       await api.post("/demos/demo/", {
         customer:             selectedCustomer.id,
         assigned_date:        assignedDate,
-        expected_return_date: returnDate,
-        duration_days:        duration,
         purpose,
         specific_requirements: requirements,
         requires_training:    needsTraining,
@@ -249,21 +242,9 @@ export function CreateNewDemo({ onSuccess, onCancel }: { onSuccess: () => void; 
             <div>
               <label style={{ fontSize: "12px", color: "#666", marginBottom: "4px", display: "block" }}>Assignment Date *</label>
               <input type="date" value={assignedDate} onChange={(e) => setAssignedDate(e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
                 style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0deda", borderRadius: "8px", fontSize: "13px", outline: "none", boxSizing: "border-box" as any }} />
             </div>
-            <div>
-              <label style={{ fontSize: "12px", color: "#666", marginBottom: "4px", display: "block" }}>Demo Duration</label>
-              <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}
-                style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0deda", borderRadius: "8px", fontSize: "13px", outline: "none", boxSizing: "border-box" as any }}>
-                {DURATION_OPTIONS.map((d) => <option key={d} value={d}>{d} Days{d === 7 ? " (Recommended)" : ""}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: "12px", color: "#666", marginBottom: "4px", display: "block" }}>Return Due Date</label>
-              <input type="date" value={returnDate} readOnly
-                style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0deda", borderRadius: "8px", fontSize: "13px", background: "#fafaf8", boxSizing: "border-box" as any }} />
-            </div>
+
             <div>
               <label style={{ fontSize: "12px", color: "#666", marginBottom: "4px", display: "block" }}>Demo Purpose *</label>
               <select value={purpose} onChange={(e) => setPurpose(e.target.value)}
@@ -333,8 +314,7 @@ export function CreateNewDemo({ onSuccess, onCancel }: { onSuccess: () => void; 
             <div style={{ fontSize: "11px", color: "#aaa", marginBottom: "8px" }}>DEMO DETAILS</div>
             {[
               ["Assigned date",  assignedDate],
-              ["Return due",     returnDate],
-              ["Duration",       `${duration} days`],
+
               ["Purpose",        PURPOSE_OPTIONS.find((o) => o.value === purpose)?.label ?? purpose],
               ["Training",       needsTraining ? "Yes" : "No"],
               ["Delivery",       needsDelivery ? "Yes" : "No"],

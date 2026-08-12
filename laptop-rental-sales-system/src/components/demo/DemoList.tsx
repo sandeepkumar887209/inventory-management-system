@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Search, Plus } from "lucide-react";
 import api from "../../services/axios";
-import { Card, Btn, Table, statusBadge, Badge, Spinner, fmtDate, fmtINR, daysDiff, C, PURPOSE_LABELS } from "./ui";
+import { Card, Btn, Table, statusBadge, Badge, Spinner, fmtDate, fmtINR, PURPOSE_LABELS, C } from "./ui";
 
 const STATUS_FILTERS = [
   { key: "ALL",              label: "All"            },
@@ -25,7 +25,7 @@ export function DemoList({ onNavigate }: { onNavigate: (path: string) => void })
   const fetchDemos = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/demos/demo/");
+      const res = await api.get("/demos/demo/?page_size=1000");
       const data = Array.isArray(res.data) ? res.data : res.data.results || [];
       setDemos(data);
     } catch (err) {
@@ -35,13 +35,7 @@ export function DemoList({ onNavigate }: { onNavigate: (path: string) => void })
     }
   };
 
-  const withOverdue = demos.map((d) => {
-    if (d.status !== "ONGOING" || !d.expected_return_date) return d;
-    const diff = daysDiff(d.expected_return_date);
-    return diff !== null && diff < 0 ? { ...d, _overdue: true } : d;
-  });
-
-  const filtered = withOverdue.filter((d) => {
+  const filtered = demos.filter((d) => {
     const q = search.toLowerCase();
     const name = (d.customer_detail?.name ?? "").toLowerCase();
     const matchSearch = !q || name.includes(q) || String(d.id).includes(q);
@@ -86,22 +80,8 @@ export function DemoList({ onNavigate }: { onNavigate: (path: string) => void })
       render: (d: any) => <span style={{ fontSize: "12px", color: "#888" }}>{fmtDate(d.assigned_date ?? d.created_at)}</span>,
     },
     {
-      key: "due", label: "Return due",
-      render: (d: any) => {
-        if (!d.expected_return_date) return <span style={{ color: "#ccc" }}>—</span>;
-        const diff = daysDiff(d.expected_return_date);
-        const isOver = d.status === "ONGOING" && diff !== null && diff < 0;
-        return (
-          <span style={{ fontSize: "12px", color: isOver ? C.red.text : diff !== null && diff <= 2 ? C.amber.text : "#888", fontWeight: isOver ? 500 : 400 }}>
-            {fmtDate(d.expected_return_date)}
-            {isOver && <span style={{ marginLeft: "6px", fontSize: "10px", background: C.red.bg, color: C.red.text, padding: "1px 6px", borderRadius: "99px" }}>{Math.abs(diff!)}d overdue</span>}
-          </span>
-        );
-      },
-    },
-    {
       key: "status", label: "Status",
-      render: (d: any) => d._overdue ? <Badge color="red">Overdue</Badge> : statusBadge(d.status),
+      render: (d: any) => statusBadge(d.status),
     },
     {
       key: "feedback", label: "Feedback",

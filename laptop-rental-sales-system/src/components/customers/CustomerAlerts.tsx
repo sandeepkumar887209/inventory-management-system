@@ -48,7 +48,6 @@ function AlertRow({ type, customer, meta, badge, onNavigate, path }: any) {
 }
 
 export function CustomerAlerts({ onNavigate }: { onNavigate: (path: string) => void }) {
-  const [overdueRentals,  setOverdueRentals]  = useState<any[]>([]);
   const [unpaidInvoices,  setUnpaidInvoices]  = useState<any[]>([]);
   const [loading,         setLoading]         = useState(true);
   const [lastRefresh,     setLastRefresh]     = useState<Date | null>(null);
@@ -94,7 +93,7 @@ export function CustomerAlerts({ onNavigate }: { onNavigate: (path: string) => v
     return diff;
   };
 
-  const total = overdueRentals.length + unpaidInvoices.length;
+  const total = unpaidInvoices.length;
 
   return (
     <div>
@@ -127,46 +126,6 @@ export function CustomerAlerts({ onNavigate }: { onNavigate: (path: string) => v
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {/* Overdue rentals */}
-          {overdueRentals.length > 0 && (
-            <Card>
-              <CardHeader
-                title={
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <AlertTriangle size={15} color={C.red.solid} />
-                    <span style={{ color: C.red.text }}>Overdue Rentals</span>
-                    <span style={{
-                      background: C.red.bg, color: C.red.text,
-                      border: `1px solid ${C.red.border}`, borderRadius: "99px",
-                      fontSize: "11px", padding: "1px 8px", fontWeight: 500,
-                    }}>
-                      {overdueRentals.length}
-                    </span>
-                  </div>
-                }
-                right={<span style={{ fontSize: "11px", color: "#bbb" }}>Immediate action required</span>}
-              />
-              <div>
-                {overdueRentals
-                  .sort((a, b) => new Date(a.expected_return_date).getTime() - new Date(b.expected_return_date).getTime())
-                  .map(r => (
-                    <AlertRow
-                      key={r.id}
-                      type="overdue"
-                      customer={r.customer_detail?.name ?? "Unknown"}
-                      meta={[
-                        `R-${r.id}`,
-                        `${r.items_detail?.length ?? 0} laptop${(r.items_detail?.length ?? 0) !== 1 ? "s" : ""}`,
-                        `Due ${fmtDate(r.expected_return_date)}`,
-                        fmtINR(r.total_amount),
-                      ]}
-                      badge={`${daysOverdue(r.expected_return_date)}d overdue`}
-                      onNavigate={onNavigate}
-                      path={`/rentals/${r.id}`}
-                    />
-                  ))}
-              </div>
-            </Card>
-          )}
 
           {/* Unpaid invoices */}
           {unpaidInvoices.length > 0 && (

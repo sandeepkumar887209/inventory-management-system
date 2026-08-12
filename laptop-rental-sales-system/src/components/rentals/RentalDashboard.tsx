@@ -36,7 +36,6 @@ export function RentalDashboard({ onNavigate }) {
   const [stats,    setStats]    = useState({});
   const [revenue,  setRevenue]  = useState([]);
   const [activity, setActivity] = useState([]);
-  const [overdue,  setOverdue]  = useState([]);
 
   useEffect(() => { load(); }, []);
 
@@ -56,12 +55,6 @@ export function RentalDashboard({ onNavigate }) {
 
       const ongoing  = rentals.filter((r) => r.status === "ONGOING");
       const returned = rentals.filter((r) => r.status === "RETURNED");
-      const overdueList = ongoing.filter((r) => {
-        if (!r.expected_return_date) return false;
-        const due = new Date(r.expected_return_date);
-        due.setHours(0, 0, 0, 0);
-        return due < today;
-      });
 
       const monthlyMap = {};
       rentals.forEach((r) => {
@@ -84,13 +77,11 @@ export function RentalDashboard({ onNavigate }) {
       setStats({
         ongoing:       ongoing.length,
         returned:      returned.length,
-        overdue:       overdueList.length,
         customers:     customers.length,
         totalRevenue,
         avgDuration,
       });
 
-      setOverdue(overdueList.slice(0, 3));
       setRevenue(Object.values(monthlyMap).slice(-6));
       setActivity(
         rentals
@@ -141,8 +132,8 @@ export function RentalDashboard({ onNavigate }) {
         <KpiCard
           label="Active rentals"
           value={stats.ongoing}
-          sub={`${stats.overdue} overdue`}
-          subColor={stats.overdue > 0 ? "down" : "up"}
+          sub="Active"
+          subColor="neutral"
         />
         <KpiCard
           label="Total revenue"
@@ -163,167 +154,46 @@ export function RentalDashboard({ onNavigate }) {
           subColor="neutral"
         />
       </div>
-
-      {/* Overdue alert bar */}
-      {stats.overdue > 0 && (
-        <div
-          style={{
-            background:    "#fff8ed",
-            border:        "1px solid #ffd499",
-            borderRadius:  "10px",
-            padding:       "12px 16px",
-            marginBottom:  "20px",
-            display:       "flex",
-            alignItems:    "center",
-            justifyContent:"space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <AlertTriangle size={15} color="#c07800" />
-            <span style={{ fontSize: "13px", color: "#7a4d00", fontWeight: 500 }}>
-              {stats.overdue} rental{stats.overdue > 1 ? "s are" : " is"} overdue and need immediate action
-            </span>
-          </div>
-          <Btn size="sm" variant="ghost" onClick={() => onNavigate("/rentals/alerts")}>
-            View alerts <ArrowRight size={12} />
-          </Btn>
-        </div>
-      )}
-
-      {/* Charts + Activity */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "16px", marginBottom: "20px" }}>
-        {/* Revenue chart */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "16px" }}>
         <Card>
-          <CardHeader title="Monthly revenue trend" />
+          <CardHeader title="Rental Revenue Trend" />
           <div style={{ padding: "16px" }}>
-            {revenue.length > 1 ? (
-              <ResponsiveContainer width="100%" height={240}>
+            {revenue.length > 0 ? (
+              <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={revenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0eeeb" />
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#aaa" }} />
                   <YAxis tick={{ fontSize: 11, fill: "#aaa" }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
-                  <Tooltip
-                    contentStyle={{ fontSize: "12px", borderRadius: "8px", border: "1px solid #e8e6e1" }}
-                    formatter={(v) => fmtINR(v)}
-                  />
-                  <Legend wrapperStyle={{ fontSize: "11px" }} />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke={C.blue.solid}
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: C.blue.solid }}
-                    name="Revenue"
-                  />
+                  <Tooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }} />
+                  <Line type="monotone" dataKey="revenue" stroke={C.teal.solid} strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div style={{ padding: "40px", textAlign: "center", color: "#ccc", fontSize: "13px" }}>
-                Not enough data yet
-              </div>
+              <div style={{ textAlign: "center", padding: "40px", color: "#bbb", fontSize: "13px" }}>No revenue data yet</div>
             )}
           </div>
         </Card>
 
-        {/* Recent activity */}
         <Card>
-          <CardHeader
-            title="Recent activity"
-            right={
-              <Btn size="sm" variant="ghost" onClick={() => onNavigate("/rentals/list")}>
-                View all
-              </Btn>
-            }
-          />
-          <div style={{ padding: "16px" }}>
-            {activity.map((r) => {
-              const statusIconMap = {
-                ONGOING:  { icon: TrendingUp, color: C.blue.solid  },
-                RETURNED: { icon: RotateCcw,  color: C.teal.solid  },
-                REPLACED: { icon: RotateCcw,  color: C.amber.solid },
-              };
-              const s = statusIconMap[r.status] ?? { icon: Clock, color: C.gray.solid };
-              return (
-                <TimelineItem
-                  key={r.id}
-                  icon={s.icon}
-                  iconColor={s.color}
-                  title={`${r.customer_detail?.name ?? "Customer"} — ${r.status.toLowerCase()}`}
-                  meta={`${r.items_detail?.length ?? 0} laptop${(r.items_detail?.length ?? 0) !== 1 ? "s" : ""} · ${fmtDate(r.created_at)}`}
-                />
-              );
-            })}
+          <CardHeader title="Recent Activity" />
+          <div style={{ padding: "16px 20px 0" }}>
             {activity.length === 0 && (
               <div style={{ textAlign: "center", color: "#ccc", fontSize: "13px", padding: "24px" }}>
                 No activity yet
               </div>
             )}
+            {activity.map((a: any) => (
+              <TimelineItem
+                key={a.id}
+                icon={TrendingUp}
+                iconColor={C.teal.solid}
+                title={`Rental for ${a.customerName}`}
+                meta={fmtDate(a.created_at)}
+              />
+            ))}
           </div>
         </Card>
       </div>
-
-      {/* Overdue quick view */}
-      {overdue.length > 0 && (
-        <Card>
-          <CardHeader
-            title="Overdue rentals"
-            right={
-              <Btn size="sm" variant="danger" onClick={() => onNavigate("/rentals/alerts")}>
-                <AlertTriangle size={12} /> View all
-              </Btn>
-            }
-          />
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-              <thead>
-                <tr style={{ background: "#fafaf8" }}>
-                  {["Customer", "Laptops", "Due date", "Overdue by", ""].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: "9px 14px", textAlign: "left",
-                        fontSize: "11px", fontWeight: 500,
-                        color: "#999", letterSpacing: "0.05em",
-                        borderBottom: "1px solid #f0eeeb",
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {overdue.map((r) => {
-                  const due  = new Date(r.expected_return_date);
-                  const diff = Math.round((new Date() - due) / 86_400_000);
-                  return (
-                    <tr key={r.id} style={{ borderBottom: "1px solid #f5f4f1" }}>
-                      <td style={{ padding: "11px 14px" }}>
-                        <div style={{ fontWeight: 500 }}>{r.customer_detail?.name ?? "—"}</div>
-                        <div style={{ fontSize: "11px", color: "#999" }}>R-{r.id}</div>
-                      </td>
-                      <td style={{ padding: "11px 14px", color: "#555" }}>
-                        {r.items_detail?.length ?? 0} laptop{(r.items_detail?.length ?? 0) !== 1 ? "s" : ""}
-                      </td>
-                      <td style={{ padding: "11px 14px", color: "#999", fontSize: "12px" }}>
-                        {fmtDate(r.expected_return_date)}
-                      </td>
-                      <td style={{ padding: "11px 14px" }}>
-                        <Badge color="red">+{diff} day{diff !== 1 ? "s" : ""}</Badge>
-                      </td>
-                      <td style={{ padding: "11px 14px" }}>
-                        <Btn size="sm" variant="ghost" onClick={() => onNavigate(`/rentals/${r.id}`)}>
-                          View
-                        </Btn>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

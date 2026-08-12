@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { LayoutDashboard, List, Plus, Building2, Wrench } from "lucide-react";
 
 import { InventoryDashboard } from "./InventoryDashboard";
@@ -10,6 +10,7 @@ import { SupplierPage }       from "./SupplierPage";
 import { MaintenancePage }    from "./MaintenancePage";
 import { Modal }              from "./ui";
 import api                    from "../../services/axios";
+import { useIdentity } from "../../context/IdentityContext";
 
 /* ── Tab definition ── */
 const TABS = [
@@ -23,9 +24,16 @@ const TABS = [
 export function InventoryModule() {
   const navigate  = useNavigate();
   const location  = useLocation();
+  const { isAdmin } = useIdentity();
   const [refresh, setRefresh] = useState(0);
   const [modal,   setModal]   = useState<null | "add" | "edit">(null);
   const [editItem,setEditItem]= useState<any>(null);
+
+  // RBAC: Filter restricted tabs
+  const filteredTabs = TABS.filter(tab => {
+    if (!isAdmin && tab.id === "suppliers") return false;
+    return true;
+  });
 
   const bump = () => setRefresh((k) => k + 1);
 
@@ -74,6 +82,7 @@ export function InventoryModule() {
     }
 
     if (p.startsWith("/inventory/suppliers")) {
+      if (!isAdmin) return <Navigate to="/inventory" replace />;
       return <SupplierPage />;
     }
 
@@ -106,7 +115,7 @@ export function InventoryModule() {
             zIndex: 20,
           }}
         >
-          {TABS.map((tab) => {
+          {filteredTabs.map((tab) => {
             const Icon     = tab.icon;
             const isActive = tab.id === activeTab;
             return (

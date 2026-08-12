@@ -33,9 +33,6 @@ class RentalItemSerializer(serializers.ModelSerializer):
     rental_id     = serializers.IntegerField(source="rental.id",          read_only=True)
     rental_status = serializers.CharField(source="rental.status",         read_only=True)
     rental_date   = serializers.DateField(source="rental.rent_date",      read_only=True)
-    expected_return_date = serializers.DateField(
-        source="rental.expected_return_date", read_only=True
-    )
     actual_return_date = serializers.DateField(
         source="rental.actual_return_date",   read_only=True
     )
@@ -52,7 +49,7 @@ class RentalItemSerializer(serializers.ModelSerializer):
             "laptop", "laptop_id",
             # parent rental context
             "rental_id", "rental_status", "rental_date",
-            "expected_return_date", "actual_return_date",
+            "actual_return_date",
             # price
             "rent_price",
             # snapshot — identity
@@ -83,7 +80,7 @@ class RentalItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "rental_id", "rental_status", "rental_date",
-            "expected_return_date", "actual_return_date",
+            "actual_return_date",
             "snapshot_brand", "snapshot_model", "snapshot_serial_number",
             "snapshot_asset_tag", "snapshot_processor", "snapshot_generation",
             "snapshot_ram", "snapshot_storage", "snapshot_gpu", "snapshot_display",

@@ -45,8 +45,11 @@ const notifications = [
   },
 ];
 
+import { useIdentity } from '../../context/IdentityContext';
+
 export function Header({ sidebarCollapsed, userName, userRole = 'User', onLogout }: HeaderProps) {
   const navigate = useNavigate();
+  const { user, isAdmin } = useIdentity();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifs, setNotifs] = useState(notifications);
@@ -71,11 +74,10 @@ export function Header({ sidebarCollapsed, userName, userRole = 'User', onLogout
     setNotifs(prev => prev.filter(n => n.id !== id));
   };
 
-  // Extract real username from localStorage (stored during Login)
-  const displayUserName = localStorage.getItem("username") || userName;
-  const displayRole = displayUserName === "admin" ? "Administrator" : "User";
+  const displayUserName = user?.full_name || localStorage.getItem("username") || "User";
+  const displayRole = user?.role_title || (displayUserName === "admin" ? "Administrator" : "User");
 
-  const initials = displayUserName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'AD';
+  const initials = displayUserName?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??';
 
   return (
     <>
@@ -566,18 +568,22 @@ export function Header({ sidebarCollapsed, userName, userRole = 'User', onLogout
 
                 <div className="lrs-menu-sep" />
 
-                <button className="lrs-menu-item" onClick={() => { navigate('/profile'); setShowUserMenu(false); }}>
+                 <button className="lrs-menu-item" onClick={() => { navigate('/profile'); setShowUserMenu(false); }}>
                   <User size={14} /> My Profile
                 </button>
-                <button className="lrs-menu-item" onClick={() => { navigate('/users'); setShowUserMenu(false); }}>
-                  <UserCog size={14} /> Users & Roles
-                </button>
-                <button className="lrs-menu-item" onClick={() => { navigate('/settings'); setShowUserMenu(false); }}>
-                  <Settings size={14} /> Settings
-                </button>
-                <button className="lrs-menu-item" onClick={() => { navigate('/activity-logs'); setShowUserMenu(false); }}>
-                  <Activity size={14} /> Activity Logs
-                </button>
+                {isAdmin && (
+                  <>
+                    <button className="lrs-menu-item" onClick={() => { navigate('/users'); setShowUserMenu(false); }}>
+                      <UserCog size={14} /> Users & Roles
+                    </button>
+                    <button className="lrs-menu-item" onClick={() => { navigate('/settings'); setShowUserMenu(false); }}>
+                      <Settings size={14} /> Settings
+                    </button>
+                    <button className="lrs-menu-item" onClick={() => { navigate('/activity-logs'); setShowUserMenu(false); }}>
+                      <Activity size={14} /> Activity Logs
+                    </button>
+                  </>
+                )}
 
                 <div className="lrs-menu-sep" />
 

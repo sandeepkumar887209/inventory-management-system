@@ -91,17 +91,7 @@ function EditField({ label, value, onSave, type = "text" }: {
 }
 
 function DaysChip({ dueDate }: { dueDate?: string }) {
-  if (!dueDate) return null;
-  const diff = Math.round((new Date(dueDate).getTime() - Date.now()) / 86_400_000);
-  const isOverdue = diff < 0;
-  const isUrgent = !isOverdue && diff <= 3;
-  const p = isOverdue ? C.red : isUrgent ? C.amber : C.teal;
-  const label = isOverdue ? `${Math.abs(diff)}d overdue` : diff === 0 ? "Due today" : `${diff}d left`;
-  return (
-    <span style={{ fontSize: "11px", fontWeight: 500, padding: "2px 9px", borderRadius: "99px", background: p.bg, color: p.text, border: `0.5px solid ${p.border}`, whiteSpace: "nowrap" as const }}>
-      {label}
-    </span>
-  );
+  return null;
 }
 
 
@@ -147,7 +137,8 @@ function CurrentAllocatedLaptops({ customerId, onNavigate }: { customerId?: stri
 
   useEffect(() => {
     if (!customerId) return;
-    api.get(`/inventory/laptops/?status=RENTED&customer=${customerId}`)
+    // Fetch ALL laptops currently assigned to this customer (RENTED + DEMO)
+    api.get(`/inventory/laptops/?customer=${customerId}`)
       .then(res => { const d = res.data; setLaptops(Array.isArray(d) ? d : d.results ?? []); })
       .catch(console.error).finally(() => setLoading(false));
   }, [customerId]);
@@ -177,10 +168,6 @@ function CurrentAllocatedLaptops({ customerId, onNavigate }: { customerId?: stri
     });
 
   const totalMonthly = laptops.reduce((s, l) => s + Number(l.rent_per_month ?? 0), 0);
-  const overdueCount = laptops.filter(l => {
-    const due = l.current_rental_due_date ?? l.rental_due_date ?? l.expected_return_date;
-    return due && new Date(due) < new Date();
-  }).length;
 
   if (loading) return <div style={{ padding: "48px", textAlign: "center", color: "#bbb", fontSize: "13px" }}>Loading allocated laptops…</div>;
 
@@ -189,10 +176,10 @@ function CurrentAllocatedLaptops({ customerId, onNavigate }: { customerId?: stri
       {/* summary strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", borderBottom: "1px solid #f0eeeb" }}>
         {[
-          { label: "Laptops on Rent",  value: String(laptops.length),  c: C.blue  },
-          { label: "Overdue Returns",  value: String(overdueCount),    c: overdueCount > 0 ? C.red : C.gray },
+          { label: "Laptops on Rent",  value: String(laptops.filter(l => l.status === "RENTED").length), c: C.blue  },
+          { label: "On Demo",          value: String(laptops.filter(l => l.status === "DEMO").length),   c: C.amber },
           { label: "Monthly Billing",  value: fmtINR(totalMonthly),    c: C.teal  },
-          { label: "Unique Models",    value: String(new Set(laptops.map(l => `${l.brand} ${l.model}`)).size), c: C.amber },
+          { label: "Unique Models",    value: String(new Set(laptops.map(l => `${l.brand} ${l.model}`)).size), c: C.gray },
         ].map((s, i) => (
           <div key={s.label} style={{ padding: "12px 18px", background: s.c.bg, borderRight: i < 3 ? "1px solid #f0eeeb" : "none" }}>
             <div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>{s.label}</div>
@@ -239,23 +226,18 @@ function CurrentAllocatedLaptops({ customerId, onNavigate }: { customerId?: stri
                     </span>
                   </th>
                 ))}
-                {/* Due Date — not sortable via ALLOC_COLS */}
-                <th style={{ padding: "9px 14px", fontSize: "10px", fontWeight: 600, color: "#999", textTransform: "uppercase" as const, borderBottom: "1px solid #f0eeeb", whiteSpace: "nowrap" as const }}>Due Date</th>
-                <th style={{ padding: "9px 14px", borderBottom: "1px solid #f0eeeb" }} />
               </tr>
             </thead>
             <tbody>
               {filtered.map(lap => {
-                const dueDate  = lap.current_rental_due_date ?? lap.rental_due_date ?? lap.expected_return_date;
                 const rentalId = lap.current_rental_id ?? lap.rental_id;
-                const isOverdue = dueDate && new Date(dueDate) < new Date();
                 const statusCfg = ALLOC_STATUS[lap.status] ?? { bg: C.gray.bg, text: C.gray.text, border: C.gray.border, label: lap.status };
 
                 return (
                   <tr key={lap.id}
-                    style={{ borderBottom: "1px solid #f5f4f1", background: isOverdue ? "#fff9f9" : "transparent", transition: "background 0.1s" }}
-                    onMouseEnter={e => { e.currentTarget.style.background = isOverdue ? "#fff0f0" : "#fafaf8"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = isOverdue ? "#fff9f9" : "transparent"; }}
+                    style={{ borderBottom: "1px solid #f5f4f1", transition: "background 0.1s" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "#fafaf8"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
                   >
                     <td style={{ padding: "11px 14px" }}>
                       <code style={{ fontSize: "11px", background: "#f0eeeb", padding: "2px 7px", borderRadius: "5px", color: "#555" }}>{lap.asset_tag || "—"}</code>
@@ -271,14 +253,6 @@ function CurrentAllocatedLaptops({ customerId, onNavigate }: { customerId?: stri
                     <td style={{ padding: "11px 14px", fontSize: "11px", color: "#555" }}>{lap.condition || "—"}</td>
                     <td style={{ padding: "11px 14px", fontWeight: 500, color: C.teal.text, textAlign: "right", whiteSpace: "nowrap" as const }}>
                       {fmtINR(lap.rent_per_month)}
-                    </td>
-                    <td style={{ padding: "11px 14px", whiteSpace: "nowrap" as const }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        {dueDate
-                          ? <><span style={{ fontSize: "12px", color: isOverdue ? C.red.text : "#555" }}>{fmtDate(dueDate)}</span><DaysChip dueDate={dueDate} /></>
-                          : <span style={{ color: "#ccc" }}>—</span>
-                        }
-                      </div>
                     </td>
                     <td style={{ padding: "11px 14px" }}>
                       {rentalId && <Btn size="sm" variant="ghost" onClick={() => onNavigate(`/rentals/${rentalId}`)}>R-{rentalId}</Btn>}
@@ -301,17 +275,19 @@ function CurrentAllocatedLaptops({ customerId, onNavigate }: { customerId?: stri
 ───────────────────────────────────────────────────────────── */
 
 type HistoryEvent = {
-  id:             number;
-  action:         string;
-  action_display: string;
-  laptop_name:    string;
-  serial:         string;
-  ref_id:         number | null;
-  ref_label:      string;
-  amount:         string | null;
-  note:           string;
-  event_date:     string | null;
-  created_at:     string;
+  id:              number;
+  action:          string;
+  action_display:  string;
+  laptop_name:     string;
+  serial:          string;
+  ref_id:          number | null;
+  ref_label:       string;
+  amount:          string | null;
+  note:            string;
+  event_date:      string | null;
+  created_at:      string;
+  snapshot_status: string;
+  snapshot_data:   Record<string, any>;
 };
 
 const H_KIND: Record<string, { label: string; Icon: any; color: typeof C.blue; sign: "out" | "in" | "neutral" }> = {
@@ -588,6 +564,66 @@ function CustomerHistoryTimeline({
                         </button>
                       )}
                     </div>
+
+                    {/* ── Snapshot strip ── */}
+                    {ev.snapshot_status && !isCreated && (() => {
+                      const sd  = ev.snapshot_data ?? {};
+                      const STATUS_COLORS: Record<string, typeof C.blue> = {
+                        ONGOING:             C.blue,
+                        COMPLETED:           C.teal,
+                        RETURNED:            C.amber,
+                        REPLACED:            C.indigo,
+                        CONVERTED_RENTAL:    C.teal,
+                        CONVERTED_SALE:      C.purple,
+                      };
+                      const sc = STATUS_COLORS[ev.snapshot_status] ?? C.gray;
+                      const chips: { label: string; value: string }[] = [];
+                      if (sd.rent_date   || sd.assigned_date || sd.sale_date)
+                        chips.push({ label: "Date",    value: fmtDate(sd.rent_date ?? sd.assigned_date ?? sd.sale_date) });
+                      if (sd.actual_return_date)
+                        chips.push({ label: "Returned",value: fmtDate(sd.actual_return_date) });
+                      if (sd.total_amount)
+                        chips.push({ label: "Total",   value: fmtINR(Number(sd.total_amount)) });
+                      if (sd.rent_price)
+                        chips.push({ label: "Rent",    value: fmtINR(Number(sd.rent_price)) });
+                      if (sd.sale_price)
+                        chips.push({ label: "Price",   value: fmtINR(Number(sd.sale_price)) });
+                      if (sd.total_items != null)
+                        chips.push({ label: "Items",   value: String(sd.total_items) });
+                      if (sd.converted_to)
+                        chips.push({ label: "→",       value: sd.converted_to });
+                      if (sd.purpose)
+                        chips.push({ label: "Purpose", value: sd.purpose });
+                      return (
+                        <div style={{
+                          marginTop: "8px", padding: "7px 10px",
+                          background: sc.bg, borderRadius: "7px",
+                          border: `0.5px solid ${sc.border}`,
+                          display: "flex", flexWrap: "wrap" as const, gap: "6px", alignItems: "center",
+                        }}>
+                          {/* status badge */}
+                          <span style={{
+                            fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em",
+                            textTransform: "uppercase" as const,
+                            color: sc.text, marginRight: "4px",
+                          }}>
+                            {ev.snapshot_status.replace(/_/g, " ")}
+                          </span>
+                          {chips.map(c => (
+                            <span key={c.label} style={{
+                              display: "inline-flex", gap: "4px", alignItems: "center",
+                              fontSize: "11px", color: sc.text,
+                              background: "rgba(255,255,255,0.55)",
+                              padding: "2px 8px", borderRadius: "99px",
+                              border: `0.5px solid ${sc.border}`,
+                            }}>
+                              <span style={{ color: "#aaa", fontSize: "10px" }}>{c.label}</span>
+                              {c.value}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -663,7 +699,7 @@ export function CustomerDetail({ onBack, onNavigate }: { onBack: () => void; onN
   const activeRentals = summary?.rentals?.active ?? rentals.filter((r) => r.status === "ONGOING").length;
 
   const tabCount: Partial<Record<Tab, number>> = {
-    history:  history.filter(e => e.event_type !== "customer_created").length,
+    history:  history.filter(e => e.action !== "CUSTOMER_CREATED").length,
     sales:    sales.length,
     invoices: invoices.length,
   };

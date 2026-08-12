@@ -20,6 +20,8 @@ class CustomerHistorySerializer(serializers.ModelSerializer):
             "ref_id",
             "ref_label",
             "amount",
+            "snapshot_status",
+            "snapshot_data",
             "note",
             "event_date",
             "created_at",

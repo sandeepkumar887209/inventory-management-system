@@ -115,6 +115,8 @@ def apply_stock_movement(sender, instance, created, **kwargs):
         "MAINTENANCE_IN":  "AVAILABLE",
         "SUPPLIER_RETURN": "RETURNED_TO_SUPPLIER",
         "WRITTEN_OFF":     "WRITTEN_OFF",
+        "DEMO_OUT":        "DEMO",
+        "DEMO_RETURN":     "AVAILABLE",
     }
 
     new_status = STATUS_MAP.get(instance.movement_type)
@@ -128,7 +130,7 @@ def apply_stock_movement(sender, instance, created, **kwargs):
     laptop.status = new_status
 
     # Clear customer when laptop is returned / goes to maintenance
-    if instance.movement_type in ("RETURN", "MAINTENANCE_IN", "IN"):
+    if instance.movement_type in ("RETURN", "MAINTENANCE_IN", "IN", "DEMO_RETURN"):
         laptop.customer = None
 
     laptop.save()

@@ -28,7 +28,6 @@ class DemoViewSet(AuditModelMixin,ModelViewSet):
         status_p  = params.get("status")
         purpose   = params.get("purpose")
         customer  = params.get("customer")
-        overdue   = params.get("overdue")
 
         if status_p:
             qs = qs.filter(status=status_p.upper())
@@ -36,11 +35,6 @@ class DemoViewSet(AuditModelMixin,ModelViewSet):
             qs = qs.filter(purpose=purpose)
         if customer:
             qs = qs.filter(customer_id=customer)
-        if overdue == "true":
-            qs = qs.filter(
-                status="ONGOING",
-                expected_return_date__lt=timezone.now().date()
-            )
         return qs
 
     # =========================================================
@@ -81,7 +75,7 @@ class DemoViewSet(AuditModelMixin,ModelViewSet):
 
             StockMovement.objects.create(
                 laptop=laptop,
-                movement_type="RETURN",
+                movement_type="DEMO_RETURN",
                 quantity=1,
                 remarks=f"Returned from Demo #{demo.id}"
             )
@@ -163,11 +157,9 @@ class DemoViewSet(AuditModelMixin,ModelViewSet):
 
     def _convert_to_rental(self, demo, laptops, request):
         from apps.rentals.models import Rental, RentalItem
-        import datetime
 
         rental = Rental.objects.create(
             customer=demo.customer,
-            expected_return_date=demo.expected_return_date + datetime.timedelta(days=30),
             status="ONGOING",
             gst=18,
         )
@@ -292,7 +284,6 @@ class DemoViewSet(AuditModelMixin,ModelViewSet):
             "returned":         qs.filter(status="RETURNED").count(),
             "converted_rental": qs.filter(status="CONVERTED_RENTAL").count(),
             "converted_sale":   qs.filter(status="CONVERTED_SALE").count(),
-            "overdue":          qs.filter(status="ONGOING", expected_return_date__lt=today).count(),
             "feedback_received":qs.filter(feedback_received=True).count(),
         })
 

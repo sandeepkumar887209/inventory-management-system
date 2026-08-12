@@ -52,7 +52,6 @@ class RentalViewSet(AuditModelMixin, ModelViewSet):
         new_rental = Rental.objects.create(
             customer=original_rental.customer,
             parent_rental=original_rental,
-            expected_return_date=original_rental.expected_return_date,
             actual_return_date=timezone.now().date(),
             status="RETURNED",
             subtotal=original_rental.subtotal,
@@ -148,7 +147,6 @@ class RentalViewSet(AuditModelMixin, ModelViewSet):
         new_rental = Rental.objects.create(
             customer=original_rental.customer,
             parent_rental=original_rental,
-            expected_return_date=original_rental.expected_return_date,
             status="REPLACED",
             subtotal=original_rental.subtotal,
             gst=original_rental.gst,

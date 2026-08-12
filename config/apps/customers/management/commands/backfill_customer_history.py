@@ -55,7 +55,7 @@ class Command(BaseCommand):
                     ref_id=rental.id,
                     ref_label=f"R-{rental.id}",
                     amount=item.rent_price,
-                    note=f"Rented: {rental_date}" + (f" · Due: {rental.expected_return_date}" if rental.expected_return_date else "")
+                    note=f"Rented: {rental_date}"
                 ))
 
                 # RETURNED / REPLACED
@@ -95,7 +95,7 @@ class Command(BaseCommand):
                     ref_id=demo.id,
                     ref_label=f"D-{demo.id}",
                     amount=0,
-                    note=f"Assigned: {out_date}" + (f" · Due: {demo.expected_return_date}" if demo.expected_return_date else "")
+                    note=f"Assigned: {out_date}"
                 ))
 
                 is_done = demo.status in ("RETURNED", "CONVERTED_RENTAL", "CONVERTED_SALE")

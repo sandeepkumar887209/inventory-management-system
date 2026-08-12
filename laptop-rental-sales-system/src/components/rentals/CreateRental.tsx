@@ -165,7 +165,6 @@ export function CreateRental({ onSuccess, onCancel }) {
       setSubmitting(true);
       await api.post("/rentals/rental/", {
         customer: selectedCustomer.id,
-        expected_return_date: new Date(Date.now() + 30 * 86_400_000).toISOString().split("T")[0],
         gst,
         subtotal,
         total_amount: total,

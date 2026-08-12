@@ -39,7 +39,6 @@ export function statusBadge(status) {
     ONGOING:  { label: "Ongoing",  color: "blue"  },
     RETURNED: { label: "Returned", color: "teal"  },
     REPLACED: { label: "Replaced", color: "amber" },
-    OVERDUE:  { label: "Overdue",  color: "red"   },
   };
   const m = map[status] ?? { label: status, color: "gray" };
   return <Badge color={m.color}>{m.label}</Badge>;
@@ -296,14 +295,6 @@ export function Empty({ message = "Nothing here yet." }) {
 export const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
-export const daysUntil  = (dateStr) => {
-  if (!dateStr) return null;
-  const due   = new Date(dateStr);
-  const today = new Date();
-  due.setHours(0,0,0,0);
-  today.setHours(0,0,0,0);
-  return Math.round((due - today) / 86_400_000);
-};
 
 export const fmtINR = (n) =>
   n != null ? `₹${Number(n).toLocaleString("en-IN")}` : "—";

@@ -42,7 +42,6 @@ export function statusBadge(status: string) {
     RETURNED:          { label: "Returned",           color: "teal"   },
     CONVERTED_RENTAL:  { label: "→ Rental",           color: "violet" },
     CONVERTED_SALE:    { label: "→ Sale",             color: "indigo" },
-    OVERDUE:           { label: "Overdue",            color: "red"    },
   };
   const m = map[status] ?? { label: status, color: "gray" };
   return <Badge color={m.color}>{m.label}</Badge>;
